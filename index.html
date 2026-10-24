@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transport Brokerage Ledger — Fleet Logistics &amp; Financial Accounts Management</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="libs/exceljs.min.js"></script>
+  <script src="libs/FileSaver.min.js"></script>
+  <script src="libs/xlsx.full.min.js"></script>
+</head>
+<body>
+
+  <!-- 1. FULL-SCREEN PERSONALIZED WELCOME & FETCH SPLASH -->
+  <div id="welcomeSplashOverlay" class="welcome-splash-overlay" style="display: none;">
+    <div class="welcome-splash-card">
+      <div class="welcome-splash-icon">🚛</div>
+      <h2 id="welcomeSplashGreeting" class="welcome-splash-title">👋 Welcome, Shravan (Admin)!</h2>
+      <p class="welcome-splash-sub">Transport Brokerage Ledger Pvt Ltd</p>
+      <div class="welcome-spinner-ring"></div>
+      <div id="welcomeSplashStatus" class="welcome-splash-status">Authenticating credentials &amp; loading verified financial records...</div>
+    </div>
+  </div>
+
+  <!-- 2. LOGIN / AUTHENTICATION SCREEN -->
+  <div id="authWrapper" class="auth-wrapper" style="display: none;">
+    <div class="auth-card">
+      <div class="auth-header">
+        <h1>🚛 Transport Brokerage Ledger</h1>
+        <p style="font-size: 0.8rem; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #1e3a8a; margin: 0.2rem 0 0.5rem;">
+          Fleet Logistics &amp; Financial Accounts Management
+        </p>
+        <p>Sign in with your secure account</p>
+      </div>
+
+      <div id="loginErrorMsg" style="display: none; color: #b91c1c; background: #fee2e2; border: 1px solid #fca5a5; padding: 0.6rem; border-radius: 6px; font-size: 0.85rem; margin-bottom: 1rem; text-align: center;"></div>
+
+      <form id="authLoginForm" onsubmit="AuthModule.handleLogin(event)">
+        <!-- Left / Right User Selector -->
+        <div class="user-switch-container">
+          <label class="user-switch-label">Select User Account</label>
+          <div class="user-switch-group">
+            <button type="button" id="userBtnAdmin" class="user-switch-card active" onclick="AuthModule.selectLoginUser('Admin')">
+              <div class="user-switch-badge">👑</div>
+              <div class="user-switch-info">
+                <span class="user-switch-name">ADMIN</span>
+                <span class="user-switch-role">Administrator</span>
+              </div>
+            </button>
+            <button type="button" id="userBtnRudra" class="user-switch-card" onclick="AuthModule.selectLoginUser('Rudra')">
+              <div class="user-switch-badge">👤</div>
+              <div class="user-switch-info">
+                <span class="user-switch-name">RUDRA</span>
+                <span class="user-switch-role">User / Operator</span>
+              </div>
+            </button>
+          </div>
+          <input type="hidden" id="loginSelectedUser" value="Admin">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label for="loginPassword" style="font-weight: 600; margin-bottom: 0.4rem; display: block; font-size: 0.88rem; color: #334155;">🔑 Password</label>
+          <div style="position: relative;">
+            <input type="password" id="loginPassword" class="form-control" placeholder="Enter password for Admin" required autocomplete="current-password" autofocus style="padding-right: 2.5rem; font-size: 1rem; width: 100%;">
+            <button type="button" id="togglePasswordBtn" onclick="AuthModule.togglePasswordVisibility()" style="position: absolute; right: 0.6rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1.1rem; padding: 0; line-height: 1;" title="Show/Hide Password">👁️</button>
+          </div>
+        </div>
+
+        <button type="submit" id="loginSubmitBtn" class="btn btn-primary" style="width: 100%; padding: 0.75rem; font-weight: 700; font-size: 1rem; border-radius: 8px; justify-content: center;">
+          🚀 Secure Login
+        </button>
+      </form>
+
+      <div style="margin-top: 1.25rem; padding-top: 0.85rem; border-top: 1px solid rgba(0,0,0,0.08); text-align: center; font-size: 0.74rem; color: #64748b; line-height: 1.6;">
+        Developed by <strong style="color: #1e40af; font-size: 0.8rem;">Shravan Kumar</strong><br>
+        Fleet Logistics &amp; Financial Accounts Management • 2026
+      </div>
+    </div>
+
+    <!-- Login Page Footer Bar -->
+    <div class="auth-footer-bar">
+      <span><strong>Brokerage Ledger • Enterprise Freight &amp; Fleet Management</strong></span>
+      <span>© 2026 Transport Brokerage Ledger Pvt Ltd • Developed by <strong>Shravan Kumar</strong> • All Rights Reserved</span>
+    </div>
+  </div>
+
+  <!-- 3. SLIDE-IN APP SIDEBAR / SETTINGS DRAWER (Screenshot 4 Style) -->
+  <aside id="appDrawer" class="app-sidebar-drawer">
+    <div class="drawer-header">
+      <div class="drawer-brand">
+        <div class="brand-icon">🚚</div>
+        <div class="brand-text">
+          <h3>Transport Brokerage Ledger</h3>
+          <span>FLEET LOGISTICS &amp; FINANCIAL ACCOUNTS MANAGEMENT</span>
+        </div>
+      </div>
+      <button class="drawer-close-btn" onclick="AppModule.closeSidebar()" aria-label="Close menu">✕</button>
+    </div>
+
+    <!-- User Profile Badge -->
+    <div class="drawer-user-card">
+      <div class="user-avatar">👤</div>
+      <div class="user-details">
+        <div id="drawerUserName" class="user-name">Shravan (Admin)</div>
+        <div class="user-role-badge"><span id="drawerUserRole">ADMIN</span></div>
+      </div>
+    </div>
+
+    <!-- Navigation Section (Zero Scrollbar) -->
+    <nav class="drawer-menu">
+      <div class="drawer-menu-label">NAVIGATION</div>
+      <button class="drawer-nav-item active" id="drawerNavDashboard" onclick="AppModule.switchView('dashboard'); AppModule.closeSidebar();">
+        <span class="drawer-item-icon">📊</span>
+        <span>Dashboard</span>
+      </button>
+      <button class="drawer-nav-item" id="drawerNavPnl" onclick="AppModule.switchView('pnl'); AppModule.closeSidebar();">
+        <span class="drawer-item-icon">💼</span>
+        <span>P&amp;L Accounts</span>
+      </button>
+      <button class="drawer-nav-item" id="drawerNavDriver" onclick="AppModule.switchView('driver'); AppModule.closeSidebar();">
+        <span class="drawer-item-icon">👤</span>
+        <span>Driver Settlements</span>
+      </button>
+      <button class="drawer-nav-item" id="drawerNavExcel" onclick="AppModule.switchView('excel'); AppModule.closeSidebar();">
+        <span class="drawer-item-icon">📑</span>
+        <span>Spreadsheet Replica</span>
+      </button>
+      <button class="drawer-nav-item" onclick="AppModule.syncNow(); AppModule.closeSidebar();">
+        <span class="drawer-item-icon">🔄</span>
+        <span>Sync Cloud Database</span>
+      </button>
+      <button class="drawer-nav-item" onclick="TableModule.exportToExcel(); AppModule.closeSidebar();">
+        <span class="drawer-item-icon">📥</span>
+        <span>Export Excel (.xlsx)</span>
+      </button>
+      <button class="drawer-nav-item" onclick="AppModule.openSettingsModal(); AppModule.closeSidebar();">
+        <span class="drawer-item-icon">⚙️</span>
+        <span>Settings &amp; API</span>
+      </button>
+      <button class="drawer-nav-item admin-only" onclick="AppModule.restoreOriginalData();">
+        <span class="drawer-item-icon">📋</span>
+        <span>Restore Excel Data</span>
+      </button>
+    </nav>
+
+    <!-- Drawer Footer (Screenshot 4: Status + Blue Sync + Red Logout Button) -->
+    <div class="drawer-footer">
+      <div class="drawer-status-bar">
+        <div class="drawer-system-status">
+          <span class="status-dot"></span>
+          <span id="drawerStatusText">Online • 2 Trucks • 7 Verified Trips</span>
+        </div>
+        <button class="drawer-sync-btn" onclick="AppModule.syncNow()" title="Trigger cloud sync">
+          <span>🔄</span> Sync
+        </button>
+      </div>
+      <button class="sidebar-logout-btn" onclick="AuthModule.logout(); AppModule.closeSidebar();">
+        <span>🚪</span> Logout / Switch User
+      </button>
+      <div class="drawer-footer-text">
+        Brokerage Ledger • Enterprise Freight &amp; Fleet Management<br>
+        © 2026 Transport Brokerage Ledger Pvt Ltd • Developed by Shravan Kumar
+      </div>
+    </div>
+  </aside>
+
+  <!-- Dimmed Backdrop for Slide-In Drawer -->
+  <div id="drawerBackdrop" class="drawer-backdrop" onclick="AppModule.closeSidebar()"></div>
+
+  <!-- 4. MAIN APPLICATION LAYOUT -->
+  <div id="appWrapper" class="app-wrapper">
+    <!-- Top Navigation Bar -->
+    <header class="app-navbar">
+      <div class="brand-section">
+        <button id="btnOpenSidebar" class="btn-menu-drawer" onclick="AppModule.toggleSidebar(event)" title="Open Navigation Drawer">
+          ☰ Menu
+        </button>
+        <div class="brand-icon">🚛</div>
+        <div class="brand-text">
+          <h1>Transport Brokerage Ledger</h1>
+          <span>Fleet Logistics &amp; Financial Accounts Management</span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs (Center) -->
+      <nav class="nav-tabs-group">
+        <button id="btnNavDashboard" class="nav-tab-btn active" onclick="AppModule.switchView('dashboard')">
+          📊 Dashboard
+        </button>
+        <button id="btnNavPnl" class="nav-tab-btn" onclick="AppModule.switchView('pnl')">
+          💼 P&amp;L Accounts
+        </button>
+        <button id="btnNavDriver" class="nav-tab-btn" onclick="AppModule.switchView('driver')">
+          👤 Driver Settlements
+        </button>
+        <button id="btnNavExcel" class="nav-tab-btn" onclick="AppModule.switchView('excel')">
+          📑 Spreadsheet Replica
+        </button>
+      </nav>
+
+      <!-- User Profile & RBAC (Right) -->
+      <div class="nav-user-panel">
+        <button id="headerCloudSyncBadge" class="header-sync-pill" onclick="AppModule.syncNow()" title="Click to trigger cloud synchronization">
+          🟢 Cloud Ready
+        </button>
+        <div class="user-info-text">
+          <span>👤</span>
+          <span id="currentUserDisplay">Shravan (Admin)</span>
+          <span id="currentUserRoleBadge" class="user-role-badge role-admin">ADMIN</span>
+        </div>
+        <button class="btn-nav-logout" onclick="AuthModule.logout()">🚪 Logout</button>
+      </div>
+    </header>
+
+    <!-- Sub-Header Filter & Action Toolbar -->
+    <div class="app-sub-toolbar">
+      <!-- Truck Selector Filter Pills -->
+      <div class="truck-filter-group">
+        <span class="filter-label">Filter Truck:</span>
+        <button id="pillFilterAll" class="truck-pill-btn active" onclick="AppModule.selectTruckFilter('ALL')">
+          🚛 All Fleet Combined
+        </button>
+        <button id="pillFilter6666" class="truck-pill-btn" onclick="AppModule.selectTruckFilter('TG15T6666')">
+          🚛 TG15T6666 (Noor Allam)
+        </button>
+        <button id="pillFilter1122" class="truck-pill-btn" onclick="AppModule.selectTruckFilter('TS15UE1122')">
+          🚛 TS15UE1122 (Allam Brother)
+        </button>
+      </div>
+
+      <!-- Right Action Buttons -->
+      <div class="toolbar-right-actions">
+        <button class="btn btn-primary" onclick="AppModule.openAddModal('trip')">
+          <span style="font-size: 1.1rem; line-height: 1;">＋</span> Add Shipment
+        </button>
+        <button class="btn btn-secondary" onclick="TableModule.exportToExcel()" title="Download genuine Excel .xlsx with preserved formulas">
+          📥 Export Excel (.xlsx)
+        </button>
+        <button class="btn btn-secondary sync-trigger-btn" onclick="AppModule.syncNow()" title="Sync Cloud Ledger">
+          🔄 Sync
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Viewport Content -->
+    <main class="app-main-viewport">
+      <!-- View 1: Executive Dashboard -->
+      <section id="view-dashboard"></section>
+
+      <!-- View 2: P&L Detailed Accounts -->
+      <section id="view-pnl" style="display: none;"></section>
+
+      <!-- View 3: Driver Settlements & Advances -->
+      <section id="view-driver" style="display: none;"></section>
+
+      <!-- View 4: Excel 1:1 Live Replica -->
+      <section id="view-excel" style="display: none;"></section>
+    </main>
+
+    <!-- System Global Footer -->
+    <footer style="background: #ffffff; border-top: 1px solid #e2e8f0; padding: 1.25rem; text-align: center; color: #64748b; font-size: 0.78rem; line-height: 1.6;">
+      <strong>Transport Brokerage Ledger Pvt Ltd</strong> • Fleet Logistics &amp; Financial Accounts Management<br>
+      © 2026 All Rights Reserved • Master Architecture Developed by <strong style="color: #1e40af;">Shravan Kumar</strong>
+    </footer>
+  </div>
+
+  <!-- 5. ADD / EDIT RECORD MODAL -->
+  <div id="addEntryModal" class="app-modal-overlay" style="display: none;">
+    <div class="app-modal-card">
+      <div class="modal-header">
+        <h3 id="addModalTitle">➕ Add Financial Entry</h3>
+        <button class="modal-close-btn" onclick="AppModule.closeModal()">✕</button>
+      </div>
+      <form onsubmit="AppModule.saveModalEntry(event)">
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="modalEntryType">Entry Type</label>
+              <select id="modalEntryType" class="form-control" onchange="AppModule.toggleModalFields(this.value)">
+                <option value="trip">Freight Shipment Trip ($P_1$)</option>
+                <option value="diesel">Diesel Fuel Entry ($P_2$)</option>
+                <option value="advance">Driver Advance Payment</option>
+                <option value="expense">En-Route Road Expense</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="modalTruckSelect">Vehicle Number</label>
+              <select id="modalTruckSelect" class="form-control">
+                <option value="TG15T6666">TG15T6666 (Noor Allam)</option>
+                <option value="TS15UE1122">TS15UE1122 (Allam Brother)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Fields: Trip -->
+          <div id="modalFieldsTrip">
+            <div class="form-group">
+              <label for="tripDates">Trip Date Range</label>
+              <input type="text" id="tripDates" class="form-control" placeholder="e.g. 21-10-26 TO 24-10-26">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="tripFrom">From (Origin)</label>
+                <input type="text" id="tripFrom" class="form-control" placeholder="e.g. MDCL">
+              </div>
+              <div class="form-group">
+                <label for="tripTo">To (Destination)</label>
+                <input type="text" id="tripTo" class="form-control" placeholder="e.g. PATNA">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="tripPnlFreight">P&amp;L Freight Amount ($P_1$)</label>
+                <input type="number" id="tripPnlFreight" class="form-control" placeholder="₹ Total Freight">
+              </div>
+              <div class="form-group">
+                <label for="tripBaseFreight">Base Freight (for 12% Comm)</label>
+                <input type="number" id="tripBaseFreight" class="form-control" placeholder="₹ Eligible Base">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="tripTransporter">Transporter Name</label>
+                <input type="text" id="tripTransporter" class="form-control" placeholder="e.g. SR TRSP">
+              </div>
+              <div class="form-group">
+                <label for="tripAdvance">Advance Received</label>
+                <input type="number" id="tripAdvance" class="form-control" placeholder="₹ Advance Received">
+              </div>
+            </div>
+          </div>
+
+          <!-- Fields: Diesel -->
+          <div id="modalFieldsDiesel" style="display: none;">
+            <div class="form-group">
+              <label for="dieselDate">Fuel Date</label>
+              <input type="text" id="dieselDate" class="form-control" placeholder="e.g. 21-10-2026">
+            </div>
+            <div class="form-group">
+              <label for="dieselPump">Fuel Station / Pump</label>
+              <input type="text" id="dieselPump" class="form-control" placeholder="e.g. HPCL Highway Plaza">
+            </div>
+            <div class="form-group">
+              <label for="dieselAmount">Amount (₹)</label>
+              <input type="number" id="dieselAmount" class="form-control" placeholder="₹ Amount">
+            </div>
+          </div>
+
+          <!-- Fields: Advance -->
+          <div id="modalFieldsAdvance" style="display: none;">
+            <div class="form-group">
+              <label for="advDate">Advance Date</label>
+              <input type="text" id="advDate" class="form-control" placeholder="e.g. 21-10-2026">
+            </div>
+            <div class="form-group">
+              <label for="advLocation">Location / Narration</label>
+              <input type="text" id="advLocation" class="form-control" placeholder="e.g. NAGAPUR ADV">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="advAmount">Advance Amount (₹)</label>
+                <input type="number" id="advAmount" class="form-control" placeholder="₹ Amount">
+              </div>
+              <div class="form-group">
+                <label for="advMode">Payment Mode</label>
+                <select id="advMode" class="form-control">
+                  <option value="Cash">Cash</option>
+                  <option value="UPI">UPI / PhonePe</option>
+                  <option value="Bank Transfer">Bank Transfer (Home Trsf)</option>
+                  <option value="Dhaba">Dhaba / Pump Slip</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fields: Expense -->
+          <div id="modalFieldsExpense" style="display: none;">
+            <div class="form-group">
+              <label for="expDesc">Expense Description</label>
+              <input type="text" id="expDesc" class="form-control" placeholder="e.g. HANMANA BODER">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="expCategory">Category</label>
+                <select id="expCategory" class="form-control">
+                  <option value="Border / Toll">Border / Toll</option>
+                  <option value="Police / Checking">Police / Checking</option>
+                  <option value="Kanta / Weighbridge">Kanta / Weighbridge</option>
+                  <option value="Labour / Loading">Labour / Loading</option>
+                  <option value="Tyre / Puncture">Tyre / Puncture</option>
+                  <option value="Greasing / Washing">Greasing / Washing</option>
+                  <option value="Pooja / Traditional">Pooja / Traditional</option>
+                  <option value="Accessories / Maintenance">Accessories / Maintenance</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="expAmount">Amount (₹)</label>
+                <input type="number" id="expAmount" class="form-control" placeholder="₹ Amount">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="AppModule.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Entry</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 6. SETTINGS MODAL -->
+  <div id="settingsModal" class="app-modal-overlay" style="display: none;">
+    <div class="app-modal-card">
+      <div class="modal-header">
+        <h3>⚙️ Cloud Ledger &amp; System Settings</h3>
+        <button class="modal-close-btn" onclick="AppModule.closeModal()">✕</button>
+      </div>
+      <form onsubmit="AppModule.saveSettings(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="settingGasEndpoint">Google Apps Script Web App URL</label>
+            <input type="url" id="settingGasEndpoint" class="form-control" placeholder="https://script.google.com/macros/s/.../exec">
+            <small style="color: #64748b; font-size: 0.74rem; display: block; margin-top: 0.35rem;">
+              Endpoint used for real-time synchronization with Google Sheets backend.
+            </small>
+          </div>
+          <div class="form-group" style="margin-top: 1.25rem; border-top: 1px solid #e2e8f0; padding-top: 1rem;">
+            <label>Master Data Reset (Admin Only)</label>
+            <button type="button" class="btn btn-secondary" onclick="AppModule.restoreOriginalData()" style="color: #b91c1c;">
+              📋 Re-seed Verified Original Excel Data
+            </button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="AppModule.closeModal()">Close</button>
+          <button type="submit" class="btn btn-primary">Save Settings</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 7. TOAST NOTIFICATIONS CONTAINER -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- 8. APPLICATION LOGIC SCRIPTS -->
+  <script src="js/data.js"></script>
+  <script src="js/calculations.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/table.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>
