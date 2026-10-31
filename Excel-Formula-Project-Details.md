@@ -178,3 +178,4 @@ $$\text{Cell } D75 = \text{=SUM(D53:D74)} = \mathbf{₹11,790}$$
 ---
 
 *© 2026 Transport Brokerage Ledger Pvt Ltd • Developed by Shravan Kumar*
+

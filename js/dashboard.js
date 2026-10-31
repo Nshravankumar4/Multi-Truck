@@ -283,3 +283,4 @@ const DashboardModule = (function () {
 if (typeof window !== 'undefined') {
   window.DashboardModule = DashboardModule;
 }
+

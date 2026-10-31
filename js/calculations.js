@@ -127,7 +127,7 @@ const CalculationsModule = (function () {
         settlementAction: 'Payable to Driver',
         actionParty: 'Shankar (Owner)',
         beneficiary: driver.name,
-        note: 'As On Date 20-10-2026, Shankar wants to Pay ₹5,040 to Noor Allam',
+        note: `As On Date ${driver.period ? driver.period.split('To')[1].trim() : '20-10-2026'}, Shankar wants to Pay ${formatINR(netBalance)} to ${driver.name}`,
         advancesCount: advances.length,
         expensesCount: roadExpenses.length
       };
@@ -159,7 +159,7 @@ const CalculationsModule = (function () {
         settlementAction: 'Payable by Driver',
         actionParty: driver.name,
         beneficiary: 'Shankar (Owner)',
-        note: 'As On Date 20-10-2026, Allam wants to Pay Shankar ₹68,170',
+        note: `As On Date ${driver.period ? driver.period.split('To')[1].trim() : '20-10-2026'}, Allam wants to Pay Shankar ${formatINR(netBalance)}`,
         advancesCount: advances.length,
         expensesCount: roadExpenses.length
       };
@@ -215,3 +215,4 @@ const CalculationsModule = (function () {
 if (typeof window !== 'undefined') {
   window.CalculationsModule = CalculationsModule;
 }
+

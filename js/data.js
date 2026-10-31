@@ -374,6 +374,29 @@ const DataModule = (function () {
     if (!trip.id) trip.id = `TRIP-${truckId}-${Date.now()}`;
     truck.trips.push(trip);
     save();
+    notifyChange('addTrip', { truckId, trip });
+    return true;
+  }
+
+  function updateTrip(truckId, tripId, updatedTrip) {
+    const truck = getTruckData(truckId);
+    if (!truck) return false;
+    const idx = truck.trips.findIndex(t => t.id === tripId);
+    if (idx === -1) return false;
+    truck.trips[idx] = Object.assign({}, truck.trips[idx], updatedTrip, { id: tripId });
+    save();
+    notifyChange('updateTrip', { truckId, tripId });
+    return true;
+  }
+
+  function deleteTrip(truckId, tripId) {
+    const truck = getTruckData(truckId);
+    if (!truck) return false;
+    const initialLen = truck.trips.length;
+    truck.trips = truck.trips.filter(t => t.id !== tripId);
+    if (truck.trips.length === initialLen) return false;
+    save();
+    notifyChange('deleteTrip', { truckId, tripId });
     return true;
   }
 
@@ -382,9 +405,33 @@ const DataModule = (function () {
     if (!truck) return false;
     if (!expense.id) expense.id = `EXP-${truckId}-${Date.now()}`;
     truck.roadExpenses.push(expense);
-    // Also update driver claimed road expenses sum
     truck.driver.roadExpensesItemizedSum = truck.roadExpenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     save();
+    notifyChange('addExpense', { truckId, expense });
+    return true;
+  }
+
+  function updateExpense(truckId, expenseId, updatedExpense) {
+    const truck = getTruckData(truckId);
+    if (!truck) return false;
+    const idx = truck.roadExpenses.findIndex(e => e.id === expenseId);
+    if (idx === -1) return false;
+    truck.roadExpenses[idx] = Object.assign({}, truck.roadExpenses[idx], updatedExpense, { id: expenseId });
+    truck.driver.roadExpensesItemizedSum = truck.roadExpenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    save();
+    notifyChange('updateExpense', { truckId, expenseId });
+    return true;
+  }
+
+  function deleteExpense(truckId, expenseId) {
+    const truck = getTruckData(truckId);
+    if (!truck) return false;
+    const initialLen = truck.roadExpenses.length;
+    truck.roadExpenses = truck.roadExpenses.filter(e => e.id !== expenseId);
+    if (truck.roadExpenses.length === initialLen) return false;
+    truck.driver.roadExpensesItemizedSum = truck.roadExpenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    save();
+    notifyChange('deleteExpense', { truckId, expenseId });
     return true;
   }
 
@@ -394,6 +441,29 @@ const DataModule = (function () {
     if (!advance.id) advance.id = `ADV-${truckId}-${Date.now()}`;
     truck.advances.push(advance);
     save();
+    notifyChange('addAdvance', { truckId, advance });
+    return true;
+  }
+
+  function updateAdvance(truckId, advanceId, updatedAdvance) {
+    const truck = getTruckData(truckId);
+    if (!truck) return false;
+    const idx = truck.advances.findIndex(a => a.id === advanceId);
+    if (idx === -1) return false;
+    truck.advances[idx] = Object.assign({}, truck.advances[idx], updatedAdvance, { id: advanceId });
+    save();
+    notifyChange('updateAdvance', { truckId, advanceId });
+    return true;
+  }
+
+  function deleteAdvance(truckId, advanceId) {
+    const truck = getTruckData(truckId);
+    if (!truck) return false;
+    const initialLen = truck.advances.length;
+    truck.advances = truck.advances.filter(a => a.id !== advanceId);
+    if (truck.advances.length === initialLen) return false;
+    save();
+    notifyChange('deleteAdvance', { truckId, advanceId });
     return true;
   }
 
@@ -404,7 +474,53 @@ const DataModule = (function () {
     truck.pl.dieselEntries.push(diesel);
     truck.pl.dieselTotal = truck.pl.dieselEntries.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
     save();
+    notifyChange('addDiesel', { truckId, diesel });
     return true;
+  }
+
+  function updateDiesel(truckId, dieselId, updatedDiesel) {
+    const truck = getTruckData(truckId);
+    if (!truck) return false;
+    const idx = truck.pl.dieselEntries.findIndex(d => d.id === dieselId);
+    if (idx === -1) return false;
+    truck.pl.dieselEntries[idx] = Object.assign({}, truck.pl.dieselEntries[idx], updatedDiesel, { id: dieselId });
+    truck.pl.dieselTotal = truck.pl.dieselEntries.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+    save();
+    notifyChange('updateDiesel', { truckId, dieselId });
+    return true;
+  }
+
+  function deleteDiesel(truckId, dieselId) {
+    const truck = getTruckData(truckId);
+    if (!truck) return false;
+    const initialLen = truck.pl.dieselEntries.length;
+    truck.pl.dieselEntries = truck.pl.dieselEntries.filter(d => d.id !== dieselId);
+    if (truck.pl.dieselEntries.length === initialLen) return false;
+    truck.pl.dieselTotal = truck.pl.dieselEntries.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+    save();
+    notifyChange('deleteDiesel', { truckId, dieselId });
+    return true;
+  }
+
+  function findRecord(type, truckId, recordId) {
+    const truck = getTruckData(truckId);
+    if (!truck) return null;
+    if (type === 'trip') {
+      return (truck.trips || []).find(t => t.id === recordId) || null;
+    } else if (type === 'diesel') {
+      return (truck.pl && truck.pl.dieselEntries ? truck.pl.dieselEntries : []).find(d => d.id === recordId) || null;
+    } else if (type === 'advance') {
+      return (truck.advances || []).find(a => a.id === recordId) || null;
+    } else if (type === 'expense') {
+      return (truck.roadExpenses || []).find(e => e.id === recordId) || null;
+    }
+    return null;
+  }
+
+  function notifyChange(action, payload) {
+    if (typeof window !== 'undefined' && window.ApiModule && typeof window.ApiModule.broadcastChange === 'function') {
+      window.ApiModule.broadcastChange(action, payload);
+    }
   }
 
   return {
@@ -412,9 +528,18 @@ const DataModule = (function () {
     getData,
     getTruckData,
     addTrip,
+    updateTrip,
+    deleteTrip,
     addExpense,
+    updateExpense,
+    deleteExpense,
     addAdvance,
+    updateAdvance,
+    deleteAdvance,
     addDiesel,
+    updateDiesel,
+    deleteDiesel,
+    findRecord,
     resetToDefaults,
     save
   };
@@ -423,3 +548,4 @@ const DataModule = (function () {
 if (typeof window !== 'undefined') {
   window.DataModule = DataModule;
 }
+

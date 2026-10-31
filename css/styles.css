@@ -2026,3 +2026,79 @@ body {
     transform: rotate(90deg);
   }
 }
+
+/* ==============================================================
+   FULLSCREEN MODE & LIVE INTERACTION STYLES
+   ============================================================== */
+.sheet-fullscreen-mode {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 99999 !important;
+  background: #f8fafc !important;
+  padding: 1rem 1.5rem !important;
+  overflow-y: auto !important;
+}
+
+body.in-sheet-fullscreen {
+  overflow: hidden !important;
+}
+
+.clickable-row:hover td {
+  background-color: #f0fdf4 !important;
+  cursor: pointer;
+}
+
+.btn-xs {
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+
+.btn-outline {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-outline:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.btn-outline-danger {
+  background: #ffffff;
+  border: 1px solid #fca5a5;
+  color: #dc2626;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-outline-danger:hover {
+  background: #fee2e2;
+  border-color: #ef4444;
+}
+
+.btn-change-pwd {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-change-pwd:hover {
+  background: #dbeafe;
+}
+
+

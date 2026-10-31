@@ -11,8 +11,10 @@ const AuthModule = (function () {
   const AUTH_STORAGE_KEY = 'FLEET_LEDGER_P2_AUTH_SESSION';
   const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
-  // Authoritative SHA-256 Hashes
-  const AUTH_CREDENTIALS = {
+  const CREDENTIALS_KEY = 'FLEET_LEDGER_P2_CREDENTIALS';
+
+  // Default Authoritative SHA-256 Hashes
+  const DEFAULT_CREDENTIALS = {
     Admin: {
       username: 'Admin',
       displayName: 'Shravan (Admin)',
@@ -25,7 +27,7 @@ const AuthModule = (function () {
       username: 'Rudra',
       displayName: 'Rudra (User)',
       role: 'USER',
-      permissions: ['read', 'export', 'sync'],
+      permissions: ['read', 'write', 'edit', 'export', 'sync'],
       // SHA-256 of "RudraSarika@2505"
       passwordHash: '0a623bcaece42a5740cdfb0b78849ec8717d811c8c2583697ab884513f4d9e3f'
     }
@@ -34,11 +36,38 @@ const AuthModule = (function () {
   let currentUser = null;
   let inactivityTimer = null;
 
+  function getCredentials() {
+    try {
+      const stored = localStorage.getItem(CREDENTIALS_KEY);
+      if (stored) {
+        return Object.assign({}, DEFAULT_CREDENTIALS, JSON.parse(stored));
+      }
+    } catch (e) {
+      console.warn('Error reading stored credentials:', e);
+    }
+    return DEFAULT_CREDENTIALS;
+  }
+
   async function sha256(str) {
     const buffer = new TextEncoder().encode(str);
     const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function updatePassword(username, newPassword) {
+    if (!username || !newPassword) return false;
+    const creds = getCredentials();
+    if (!creds[username]) return false;
+    const hash = await sha256(newPassword);
+    creds[username].passwordHash = hash;
+    localStorage.setItem(CREDENTIALS_KEY, JSON.stringify(creds));
+    
+    // Notify cloud backend if configured
+    if (typeof window !== 'undefined' && window.ApiModule && typeof window.ApiModule.pushPasswordUpdate === 'function') {
+      window.ApiModule.pushPasswordUpdate(username, hash);
+    }
+    return true;
   }
 
   function init() {
@@ -113,7 +142,8 @@ const AuthModule = (function () {
 
     try {
       const inputHash = await sha256(password);
-      const targetUser = AUTH_CREDENTIALS[selectedUser];
+      const creds = getCredentials();
+      const targetUser = creds[selectedUser];
 
       if (!targetUser || inputHash !== targetUser.passwordHash) {
         // Strict security: generic error, no hints
@@ -307,10 +337,12 @@ const AuthModule = (function () {
     logout,
     togglePasswordVisibility,
     getCurrentUser,
-    isAdmin
+    isAdmin,
+    updatePassword
   };
 })();
 
 if (typeof window !== 'undefined') {
   window.AuthModule = AuthModule;
 }
+

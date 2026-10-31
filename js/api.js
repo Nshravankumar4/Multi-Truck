@@ -1,6 +1,7 @@
 /**
  * Fleet Logistics & Financial Accounts Management - API & Cloud Sync
  * Communicates with Google Apps Script backend with auto-sync and offline resilience
+ * BroadcastChannel cross-tab live synchronization & DATA_VERSION tracking
  * Developed by Shravan Kumar • 2026
  */
 
@@ -8,10 +9,30 @@ const ApiModule = (function () {
   'use strict';
 
   const GAS_URL_KEY = 'FLEET_LEDGER_P2_GAS_ENDPOINT';
+  const DATA_VERSION_KEY = 'FLEET_LEDGER_P2_DATA_VERSION';
   const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxhwvJi8UDsJd2yFo9oprDAQGS8M9L6UfcM5M9Tmn98UPZFP8ijYdS9ZIYAl4hiyKbopA/exec';
 
   let syncTimer = null;
   let isSyncing = false;
+
+  // Real-time Cross-Tab Synchronization via BroadcastChannel
+  const syncChannel = (typeof window !== 'undefined' && typeof window.BroadcastChannel !== 'undefined')
+    ? new BroadcastChannel('sr_transport_sync_channel')
+    : null;
+
+  if (syncChannel) {
+    syncChannel.onmessage = function (event) {
+      if (event && event.data) {
+        console.log('Cross-tab sync message received:', event.data);
+        if (typeof DataModule !== 'undefined') {
+          DataModule.init();
+        }
+        if (typeof AppModule !== 'undefined' && typeof AppModule.renderCurrentView === 'function') {
+          AppModule.renderCurrentView();
+        }
+      }
+    };
+  }
 
   function getEndpoint() {
     return localStorage.getItem(GAS_URL_KEY) || DEFAULT_GAS_URL;
@@ -25,16 +46,65 @@ const ApiModule = (function () {
     }
   }
 
+  function getDataVersion() {
+    return parseInt(localStorage.getItem(DATA_VERSION_KEY) || '1', 10);
+  }
+
+  function incrementDataVersion() {
+    const nextVer = getDataVersion() + 1;
+    localStorage.setItem(DATA_VERSION_KEY, String(nextVer));
+    return nextVer;
+  }
+
+  function broadcastChange(action, payload) {
+    const newVer = incrementDataVersion();
+    if (syncChannel) {
+      try {
+        syncChannel.postMessage({
+          action,
+          payload,
+          version: newVer,
+          timestamp: Date.now()
+        });
+      } catch (e) {
+        console.warn('BroadcastChannel error:', e);
+      }
+    }
+  }
+
   function init() {
     startAutoSync();
+    checkConnection();
   }
 
   function startAutoSync() {
     if (syncTimer) clearInterval(syncTimer);
-    // Background ping every 30 seconds
+    // Background polling every 15 seconds
     syncTimer = setInterval(() => {
       checkConnection();
-    }, 30000);
+      checkCloudVersionAndSync();
+    }, 15000);
+  }
+
+  async function checkCloudVersionAndSync() {
+    const endpoint = getEndpoint();
+    if (!endpoint || !navigator.onLine) return;
+
+    try {
+      const resp = await fetch(`${endpoint}?action=getVersion`, {
+        method: 'GET',
+        mode: 'cors'
+      });
+      if (resp.ok) {
+        const res = await resp.json();
+        if (res && res.version && res.version > getDataVersion()) {
+          console.log(`Cloud update detected (${res.version} > ${getDataVersion()}). Syncing...`);
+          await syncNow(true);
+        }
+      }
+    } catch (e) {
+      // Quiet background check
+    }
   }
 
   async function checkConnection() {
@@ -63,7 +133,7 @@ const ApiModule = (function () {
     }
   }
 
-  async function syncNow() {
+  async function syncNow(isBackground = false) {
     if (isSyncing) return;
     isSyncing = true;
 
@@ -80,12 +150,8 @@ const ApiModule = (function () {
     });
 
     try {
-      // Simulate/perform cloud sync
-      await new Promise(res => setTimeout(res, 800));
-
-      // In real deployment with valid GAS_URL:
       const endpoint = getEndpoint();
-      if (endpoint && endpoint !== '') {
+      if (endpoint && endpoint !== '' && navigator.onLine) {
         try {
           const resp = await fetch(`${endpoint}?action=getData&truckId=ALL`, {
             method: 'GET',
@@ -93,7 +159,7 @@ const ApiModule = (function () {
           });
           if (resp.ok) {
             const result = await resp.json();
-            if (result && result.status === 'success' && result.data) {
+            if (result && result.status === 'success' && result.records) {
               console.log('Live cloud sync completed successfully:', result);
             }
           }
@@ -107,7 +173,7 @@ const ApiModule = (function () {
         statusPill.className = 'header-sync-pill status-synced';
       }
 
-      if (window.AppModule && window.AppModule.showToast) {
+      if (!isBackground && window.AppModule && window.AppModule.showToast) {
         window.AppModule.showToast('✅ Cloud database synchronized successfully!', 'success');
       }
     } catch (err) {
@@ -125,15 +191,67 @@ const ApiModule = (function () {
     }
   }
 
+  async function pushPasswordUpdate(username, hash) {
+    const endpoint = getEndpoint();
+    if (!endpoint || !navigator.onLine) return;
+    try {
+      await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'updatePassword',
+          username: username,
+          passwordHash: hash,
+          timestamp: new Date().toISOString()
+        })
+      });
+    } catch (e) {
+      console.warn('Could not push password to cloud:', e);
+    }
+  }
+
+  // Sanitization and Formatting Helpers
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function escapeAttr(str) {
+    return escapeHtml(str);
+  }
+
+  function parseAmount(val) {
+    if (!val) return 0;
+    const clean = String(val).replace(/[^0-9.-]/g, '');
+    const num = parseFloat(clean);
+    return isNaN(num) ? 0 : Math.round(num);
+  }
+
   return {
     init,
     getEndpoint,
     setEndpoint,
+    getDataVersion,
+    incrementDataVersion,
+    broadcastChange,
     syncNow,
-    checkConnection
+    checkConnection,
+    checkCloudVersionAndSync,
+    pushPasswordUpdate,
+    escapeHtml,
+    escapeAttr,
+    parseAmount
   };
 })();
 
 if (typeof window !== 'undefined') {
   window.ApiModule = ApiModule;
+  window.escapeHtml = ApiModule.escapeHtml;
+  window.escapeAttr = ApiModule.escapeAttr;
+  window.parseAmount = ApiModule.parseAmount;
 }

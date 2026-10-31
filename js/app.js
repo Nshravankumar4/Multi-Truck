@@ -1,6 +1,6 @@
 /**
  * Fleet Logistics & Financial Accounts Management - App Controller
- * Orchestrates views, sidebar drawer, truck filters, modals, and toasts
+ * Orchestrates views, sidebar drawer, truck filters, modals, full CRUD, and toasts
  * Developed by Shravan Kumar • 2026
  */
 
@@ -10,6 +10,12 @@ const AppModule = (function () {
   let currentView = 'dashboard';
   let currentTruckFilter = 'ALL';
   let currentMonthFilter = '2026-10';
+
+  // Edit State Tracking
+  let isEditing = false;
+  let editingRecordType = null;
+  let editingTruckId = null;
+  let editingRecordId = null;
 
   function init() {
     DataModule.init();
@@ -21,11 +27,15 @@ const AppModule = (function () {
   }
 
   function setupGlobalEventListeners() {
-    // Keyboard Escape key
+    // Keyboard Escape key handling
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closeSidebar();
         closeModal();
+        const viewExcel = document.getElementById('view-excel');
+        if (viewExcel && viewExcel.classList.contains('sheet-fullscreen-mode')) {
+          TableModule.toggleFullscreen();
+        }
       }
     });
   }
@@ -128,7 +138,6 @@ const AppModule = (function () {
   function toggleSidebar(e) {
     if (e && e.stopPropagation) e.stopPropagation();
     const drawer = document.getElementById('appDrawer');
-    const backdrop = document.getElementById('drawerBackdrop');
     if (!drawer) return;
 
     if (drawer.classList.contains('open')) {
@@ -154,18 +163,26 @@ const AppModule = (function () {
     document.body.style.overflow = '';
   }
 
-  // Modal Dialogs
-  function openAddModal(type, targetTruck) {
+  // Modal Dialogs & CRUD Operations
+  function openAddModal(type = 'trip', targetTruck = null) {
+    isEditing = false;
+    editingRecordType = null;
+    editingTruckId = null;
+    editingRecordId = null;
+
     const modal = document.getElementById('addEntryModal');
     const title = document.getElementById('addModalTitle');
     const truckSelect = document.getElementById('modalTruckSelect');
     const typeSelect = document.getElementById('modalEntryType');
+    const submitBtn = document.getElementById('modalSubmitBtn');
 
-    if (truckSelect && targetTruck) {
-      truckSelect.value = targetTruck;
+    if (truckSelect) {
+      truckSelect.value = targetTruck || (currentTruckFilter === 'ALL' ? 'TG15T6666' : currentTruckFilter);
+      truckSelect.disabled = false;
     }
-    if (typeSelect && type) {
+    if (typeSelect) {
       typeSelect.value = type;
+      typeSelect.disabled = false;
       toggleModalFields(type);
     }
 
@@ -177,7 +194,143 @@ const AppModule = (function () {
       else title.textContent = '➕ Add Financial Entry';
     }
 
+    if (submitBtn) submitBtn.textContent = 'Save Entry';
+
+    // Reset Inputs
+    clearModalInputs();
+
     if (modal) modal.style.display = 'flex';
+  }
+
+  function openEditModal(type, truckId, recordId) {
+    const record = DataModule.findRecord(type, truckId, recordId);
+    if (!record) {
+      showToast('Record not found.', 'danger');
+      return;
+    }
+
+    isEditing = true;
+    editingRecordType = type;
+    editingTruckId = truckId;
+    editingRecordId = recordId;
+
+    const modal = document.getElementById('addEntryModal');
+    const title = document.getElementById('addModalTitle');
+    const truckSelect = document.getElementById('modalTruckSelect');
+    const typeSelect = document.getElementById('modalEntryType');
+    const submitBtn = document.getElementById('modalSubmitBtn');
+
+    if (truckSelect) {
+      truckSelect.value = truckId;
+      truckSelect.disabled = true; // Lock truck during edit
+    }
+    if (typeSelect) {
+      typeSelect.value = type;
+      typeSelect.disabled = true; // Lock type during edit
+      toggleModalFields(type);
+    }
+
+    if (title) {
+      if (type === 'trip') title.textContent = '✏️ Edit Freight Shipment Trip';
+      else if (type === 'diesel') title.textContent = '✏️ Edit Diesel Fuel Slip';
+      else if (type === 'advance') title.textContent = '✏️ Edit Driver Advance Payment';
+      else if (type === 'expense') title.textContent = '✏️ Edit En-Route Road Expense';
+      else title.textContent = '✏️ Edit Entry';
+    }
+
+    if (submitBtn) submitBtn.textContent = 'Save Changes';
+
+    // Populate Fields
+    if (type === 'trip') {
+      const datesInput = document.getElementById('tripDates');
+      const fromInput = document.getElementById('tripFrom');
+      const toInput = document.getElementById('tripTo');
+      const pnlInput = document.getElementById('tripPnlFreight');
+      const baseInput = document.getElementById('tripBaseFreight');
+      const transInput = document.getElementById('tripTransporter');
+      const advInput = document.getElementById('tripAdvance');
+
+      if (datesInput) datesInput.value = record.dateRange || '';
+      if (fromInput) fromInput.value = record.from || '';
+      if (toInput) toInput.value = record.to || '';
+      if (pnlInput) pnlInput.value = record.pnlFreight || '';
+      if (baseInput) baseInput.value = record.baseFreight || '';
+      if (transInput) transInput.value = record.transporter || '';
+      if (advInput) advInput.value = record.advanceReceived || '';
+    } else if (type === 'diesel') {
+      const dateInput = document.getElementById('dieselDate');
+      const pumpInput = document.getElementById('dieselPump');
+      const amtInput = document.getElementById('dieselAmount');
+
+      if (dateInput) dateInput.value = record.date || '';
+      if (pumpInput) pumpInput.value = record.pump || '';
+      if (amtInput) amtInput.value = record.amount || '';
+    } else if (type === 'advance') {
+      const dateInput = document.getElementById('advDate');
+      const locInput = document.getElementById('advLocation');
+      const amtInput = document.getElementById('advAmount');
+      const modeInput = document.getElementById('advMode');
+
+      if (dateInput) dateInput.value = record.date || '';
+      if (locInput) locInput.value = record.location || '';
+      if (amtInput) amtInput.value = record.amount || '';
+      if (modeInput) modeInput.value = record.mode || 'Cash';
+    } else if (type === 'expense') {
+      const descInput = document.getElementById('expDesc');
+      const catInput = document.getElementById('expCategory');
+      const amtInput = document.getElementById('expAmount');
+
+      if (descInput) descInput.value = record.description || '';
+      if (catInput) catInput.value = record.category || 'Border / Toll';
+      if (amtInput) amtInput.value = record.amount || '';
+    }
+
+    if (modal) modal.style.display = 'flex';
+  }
+
+  function confirmDelete(type, truckId, recordId) {
+    if (!AuthModule.isAdmin()) {
+      showToast('⚠️ Rudra can add and edit records but cannot delete them.', 'danger');
+      return;
+    }
+
+    const typeLabels = {
+      trip: 'freight shipment trip',
+      diesel: 'diesel fuel entry',
+      advance: 'driver advance record',
+      expense: 'road expense receipt'
+    };
+    const label = typeLabels[type] || 'record';
+
+    if (confirm(`Are you sure you want to permanently delete this ${label}?`)) {
+      let success = false;
+      if (type === 'trip') {
+        success = DataModule.deleteTrip(truckId, recordId);
+      } else if (type === 'diesel') {
+        success = DataModule.deleteDiesel(truckId, recordId);
+      } else if (type === 'advance') {
+        success = DataModule.deleteAdvance(truckId, recordId);
+      } else if (type === 'expense') {
+        success = DataModule.deleteExpense(truckId, recordId);
+      }
+
+      if (success) {
+        showToast('🗑️ Record deleted successfully.', 'success');
+        renderCurrentView();
+      } else {
+        showToast('Failed to delete record.', 'danger');
+      }
+    }
+  }
+
+  function clearModalInputs() {
+    ['tripDates', 'tripFrom', 'tripTo', 'tripPnlFreight', 'tripBaseFreight', 'tripTransporter', 'tripAdvance',
+     'dieselDate', 'dieselPump', 'dieselAmount',
+     'advDate', 'advLocation', 'advAmount',
+     'expDesc', 'expAmount'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
   }
 
   function toggleModalFields(type) {
@@ -195,6 +348,10 @@ const AppModule = (function () {
   function closeModal() {
     const modals = document.querySelectorAll('.app-modal-overlay');
     modals.forEach(m => (m.style.display = 'none'));
+    isEditing = false;
+    editingRecordType = null;
+    editingTruckId = null;
+    editingRecordId = null;
   }
 
   function saveModalEntry(e) {
@@ -202,11 +359,6 @@ const AppModule = (function () {
 
     const type = document.getElementById('modalEntryType').value;
     const truckId = document.getElementById('modalTruckSelect').value;
-
-    if (!AuthModule.isAdmin()) {
-      alert('Only Administrator account has permission to add or modify ledger entries.');
-      return;
-    }
 
     if (type === 'trip') {
       const dates = document.getElementById('tripDates').value.trim();
@@ -218,11 +370,11 @@ const AppModule = (function () {
       const adv = Number(document.getElementById('tripAdvance').value) || 0;
 
       if (!dates || !from || !to || !pnlFreight) {
-        alert('Please fill in all mandatory trip details.');
+        alert('Please fill in all mandatory trip details (Dates, From, To, and Freight Amount).');
         return;
       }
 
-      DataModule.addTrip(truckId, {
+      const tripPayload = {
         dateRange: dates,
         from,
         to,
@@ -233,9 +385,16 @@ const AppModule = (function () {
         advanceReceived: adv,
         balanceFreight: pnlFreight - adv,
         podStatus: 'Delivered',
-        remarks: 'Added via web portal'
-      });
-      showToast('✅ Trip added successfully to ledger!', 'success');
+        remarks: isEditing ? 'Updated via web portal' : 'Added via web portal'
+      };
+
+      if (isEditing && editingRecordId) {
+        DataModule.updateTrip(truckId, editingRecordId, tripPayload);
+        showToast('✅ Trip details updated successfully!', 'success');
+      } else {
+        DataModule.addTrip(truckId, tripPayload);
+        showToast('✅ Trip added successfully to ledger!', 'success');
+      }
 
     } else if (type === 'diesel') {
       const date = document.getElementById('dieselDate').value.trim();
@@ -247,12 +406,19 @@ const AppModule = (function () {
         return;
       }
 
-      DataModule.addDiesel(truckId, {
+      const dieselPayload = {
         date: date || 'Oct 2026',
         pump: pump || 'Highway Pump',
         amount
-      });
-      showToast('⛽ Diesel fuel slip recorded!', 'success');
+      };
+
+      if (isEditing && editingRecordId) {
+        DataModule.updateDiesel(truckId, editingRecordId, dieselPayload);
+        showToast('⛽ Diesel fuel entry updated!', 'success');
+      } else {
+        DataModule.addDiesel(truckId, dieselPayload);
+        showToast('⛽ Diesel fuel slip recorded!', 'success');
+      }
 
     } else if (type === 'advance') {
       const date = document.getElementById('advDate').value.trim();
@@ -265,13 +431,20 @@ const AppModule = (function () {
         return;
       }
 
-      DataModule.addAdvance(truckId, {
+      const advancePayload = {
         date: date || 'Oct 2026',
         location,
         amount,
         mode
-      });
-      showToast('💵 Driver advance payment recorded!', 'success');
+      };
+
+      if (isEditing && editingRecordId) {
+        DataModule.updateAdvance(truckId, editingRecordId, advancePayload);
+        showToast('💵 Driver advance updated!', 'success');
+      } else {
+        DataModule.addAdvance(truckId, advancePayload);
+        showToast('💵 Driver advance payment recorded!', 'success');
+      }
 
     } else if (type === 'expense') {
       const desc = document.getElementById('expDesc').value.trim();
@@ -283,12 +456,19 @@ const AppModule = (function () {
         return;
       }
 
-      DataModule.addExpense(truckId, {
+      const expPayload = {
         description: desc,
         category: cat,
         amount
-      });
-      showToast('🚨 Road expense recorded!', 'success');
+      };
+
+      if (isEditing && editingRecordId) {
+        DataModule.updateExpense(truckId, editingRecordId, expPayload);
+        showToast('🚨 Road expense updated!', 'success');
+      } else {
+        DataModule.addExpense(truckId, expPayload);
+        showToast('🚨 Road expense recorded!', 'success');
+      }
     }
 
     closeModal();
@@ -332,6 +512,47 @@ const AppModule = (function () {
     ApiModule.syncNow();
   }
 
+  // Password Change
+  function openChangePasswordModal() {
+    const modal = document.getElementById('changePasswordModal');
+    const userSpan = document.getElementById('changePwdUserDisplay');
+    const curUser = AuthModule.getCurrentUser();
+    if (userSpan && curUser) {
+      userSpan.textContent = curUser.displayName;
+    }
+    const newPwd = document.getElementById('newPasswordInput');
+    const confirmPwd = document.getElementById('confirmPasswordInput');
+    if (newPwd) newPwd.value = '';
+    if (confirmPwd) confirmPwd.value = '';
+    if (modal) modal.style.display = 'flex';
+  }
+
+  async function savePasswordChange(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const curUser = AuthModule.getCurrentUser();
+    if (!curUser) return;
+
+    const newPwd = (document.getElementById('newPasswordInput') || {}).value;
+    const confirmPwd = (document.getElementById('confirmPasswordInput') || {}).value;
+
+    if (!newPwd || newPwd.length < 4) {
+      alert('Password must be at least 4 characters long.');
+      return;
+    }
+    if (newPwd !== confirmPwd) {
+      alert('Passwords do not match. Please re-enter.');
+      return;
+    }
+
+    const success = await AuthModule.updatePassword(curUser.username, newPwd);
+    if (success) {
+      closeModal();
+      showToast('🔑 Password changed successfully!', 'success');
+    } else {
+      alert('Failed to update password.');
+    }
+  }
+
   function showToast(message, type = 'info') {
     const container = document.getElementById('toastContainer');
     if (!container) return;
@@ -364,15 +585,20 @@ const AppModule = (function () {
     openSidebar,
     closeSidebar,
     openAddModal,
+    openEditModal,
+    confirmDelete,
     toggleModalFields,
     closeModal,
     saveModalEntry,
     openSettingsModal,
     saveSettings,
     restoreOriginalData,
+    openChangePasswordModal,
+    savePasswordChange,
     syncNow,
     showToast,
-    onUserAuthenticated
+    onUserAuthenticated,
+    renderCurrentView
   };
 })();
 

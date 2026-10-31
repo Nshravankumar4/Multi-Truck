@@ -38,9 +38,19 @@ The system features client-side SHA-256 password hashing with **zero exposure of
 | Account | Role | Verification | Permissions |
 | :--- | :--- | :--- | :--- |
 | **ADMIN** | Shravan (Admin) | SHA-256 Verified | Full Read, Write, Edit, Delete, Export, Reset & Backup |
-| **USER / OPERATOR** | Rudra (User) | SHA-256 Verified | Read-only Dashboard, P&L, Driver Ledgers & Excel Export |
+| **USER / OPERATOR** | Rudra (User) | SHA-256 Verified | Read, Write & Edit Daily Records; Delete & Settings Blocked |
 
 *Note: Any session idle for longer than 10 minutes automatically terminates with session clearing to safeguard financial ledgers.*
+
+---
+
+## ⚡ Interactive Spreadsheet & Concurrency Features
+
+- **Dynamic 1:1 Live Excel Replica**: Live reactive spreadsheet views (`1122_6666_P&L Account`, `1122_6666_Driver`, `TG15T6666_Sept`, `TS15UE1122_Sept`) reflecting real-time mutations with interactive formula tooltips, cell highlights, Zoom scaling (80%, 90%, 100%, 115%), and Fullscreen distraction-free mode.
+- **Click-to-Edit & Full CRUD**: Click any trip, diesel slip, advance, or road expense row across P&L, Driver, or Spreadsheet views to open the edit modal.
+- **Cross-Tab Synchronization**: Native `BroadcastChannel('sr_transport_sync_channel')` ensures instant ledger propagation across multiple browser tabs without page reloads.
+- **Optimistic Concurrency & Drive Snapshots**: Backend `Code.gs` enforces 30-second `LockService` locks, tracks `DATA_VERSION` via `_Meta` sheet, provides lightweight polling, and creates automatic Drive backup snapshots before mutations.
+- **Automated Verification Suite**: 16/16 automated test suite (`test_suite.ps1`) validating core files, concurrency, RBAC guards, calculations, dynamic rendering, and Excel exports.
 
 ---
 
@@ -99,3 +109,4 @@ The system features client-side SHA-256 password hashing with **zero exposure of
 ---
 
 *© 2026 Transport Brokerage Ledger Pvt Ltd • Developed by Shravan Kumar*
+
