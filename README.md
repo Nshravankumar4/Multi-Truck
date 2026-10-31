@@ -44,13 +44,17 @@ The system features client-side SHA-256 password hashing with **zero exposure of
 
 ---
 
-## ⚡ Interactive Spreadsheet & Concurrency Features
+## ⚡ Enterprise Multi-Project, Date & Concurrency Features
 
-- **Dynamic 1:1 Live Excel Replica**: Live reactive spreadsheet views (`1122_6666_P&L Account`, `1122_6666_Driver`, `TG15T6666_Sept`, `TS15UE1122_Sept`) reflecting real-time mutations with interactive formula tooltips, cell highlights, Zoom scaling (80%, 90%, 100%, 115%), and Fullscreen distraction-free mode.
-- **Click-to-Edit & Full CRUD**: Click any trip, diesel slip, advance, or road expense row across P&L, Driver, or Spreadsheet views to open the edit modal.
-- **Cross-Tab Synchronization**: Native `BroadcastChannel('sr_transport_sync_channel')` ensures instant ledger propagation across multiple browser tabs without page reloads.
-- **Optimistic Concurrency & Drive Snapshots**: Backend `Code.gs` enforces 30-second `LockService` locks, tracks `DATA_VERSION` via `_Meta` sheet, provides lightweight polling, and creates automatic Drive backup snapshots before mutations.
-- **Automated Verification Suite**: 16/16 automated test suite (`test_suite.ps1`) validating core files, concurrency, RBAC guards, calculations, dynamic rendering, and Excel exports.
+- **Multi-Project Management**: Independent projects with isolated data, dedicated Google Spreadsheet IDs, and project-specific fleets.
+- **Dynamic Unlimited Fleet**: Register any commercial truck dynamically; auto-populates truck filter pills and driver assignments without code changes.
+- **Date & Accounting Period Architecture**: Every transaction contains a transaction date and period (`YYYY-MM`). Filter by active period (`2026-10`), historical archive (`2026-09`), or custom date ranges without cross-month corruption.
+- **Fleet Driver Settlements Overview**: Fixed BUG-001—selecting "All Fleet Combined" aggregates driver commissions, advances, and payables/receivables across all drivers.
+- **Authoritative Reconciliation**: Explicitly reconciles the ₹35 difference on `TG15T6666` between itemized road receipts (₹28,735) and driver-claimed voucher (₹28,700).
+- **Bidirectional Cloud Sync**: Fixed BUG-004—client pushes mutations, receives server reconciliation, merges and persists to LocalStorage with accurate status badges (`🟢 Synced`, `🔄 Syncing`, `⚪ Offline`, `🔴 Error`).
+- **Dynamic 1:1 Live Excel Replica**: Live reactive spreadsheet views with interactive formula tooltips, Zoom scaling (80%, 90%, 100%, 115%), and Fullscreen distraction-free mode.
+- **Optimistic Concurrency & Drive Snapshots**: Backend `Code.gs` enforces 30-second `LockService` locks, tracks `DATA_VERSION` via `_Meta` sheet, and creates automatic Drive backup snapshots before mutations.
+- **Automated Verification Suite**: 20/20 automated test suite (`test_suite.ps1`) validating core files, concurrency, RBAC guards, calculations, dynamic rendering, and Excel exports.
 
 ---
 

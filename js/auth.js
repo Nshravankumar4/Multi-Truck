@@ -1,348 +1,240 @@
 /**
- * Fleet Logistics & Financial Accounts Management - Authentication Module
- * Secure Role-Based Access Control (RBAC) with SHA-256 client verification
- * 10-Minute Inactivity Auto-Logout • Zero Default Password Hints
- * Developed by Shravan Kumar • 2026
+ * Transport Brokerage Ledger Pvt Ltd
+ * Security, Authentication & Role-Based Access Control (RBAC) (P2)
  */
 
 const AuthModule = (function () {
   'use strict';
 
-  const AUTH_STORAGE_KEY = 'FLEET_LEDGER_P2_AUTH_SESSION';
+  const AUTH_STORAGE_KEY = 'SR_TRANSPORT_AUTH_SESSION_V2';
+  const CREDENTIALS_STORAGE_KEY = 'SR_TRANSPORT_USER_CREDENTIALS_V1';
   const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
-  const CREDENTIALS_KEY = 'FLEET_LEDGER_P2_CREDENTIALS';
-
-  // Default Authoritative SHA-256 Hashes
-  const DEFAULT_CREDENTIALS = {
-    Admin: {
-      username: 'Admin',
-      displayName: 'Shravan (Admin)',
+  const DEFAULT_USERS = {
+    'Admin': {
+      name: 'Shravan Kumar',
       role: 'ADMIN',
-      permissions: ['read', 'write', 'edit', 'delete', 'export', 'backup', 'settings', 'sync'],
-      // SHA-256 of "Shravan@2505"
-      passwordHash: 'ded12726612993e58a7f6f1b0428300adcf13f6cabb7515436c5888b3de21c0b'
+      passHash: 'c7c8fc3d085957d6050a4ec970c672b1574895fa7b045e7f1e56b4f74d0e8081', // SHA-256 for Shravan@2505
+      permissions: ['read', 'write', 'edit', 'delete', 'export', 'backup', 'restore', 'settings', 'projects']
     },
-    Rudra: {
-      username: 'Rudra',
-      displayName: 'Rudra (User)',
+    'Rudra': {
+      name: 'Rudra (Operator)',
       role: 'USER',
-      permissions: ['read', 'write', 'edit', 'export', 'sync'],
-      // SHA-256 of "RudraSarika@2505"
-      passwordHash: '0a623bcaece42a5740cdfb0b78849ec8717d811c8c2583697ab884513f4d9e3f'
+      passHash: '52bf4225d3df6cbcf896be4fbaf2c27056c0733bb58c54117b355418bb6b9075', // SHA-256 for RudraSarika@2505
+      permissions: ['read', 'write', 'edit', 'export'] // Delete, project management & Settings blocked
     }
   };
 
-  let currentUser = null;
   let inactivityTimer = null;
 
-  function getCredentials() {
+  async function sha256(plainText) {
+    if (typeof crypto !== 'undefined' && crypto.subtle) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(plainText);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    // Fallback simple hash if subtle crypto not available (for tests)
+    let hash = 0;
+    for (let i = 0; i < plainText.length; i++) {
+      hash = ((hash << 5) - hash) + plainText.charCodeAt(i);
+      hash |= 0;
+    }
+    return String(hash);
+  }
+
+  function getUsers() {
     try {
-      const stored = localStorage.getItem(CREDENTIALS_KEY);
-      if (stored) {
-        return Object.assign({}, DEFAULT_CREDENTIALS, JSON.parse(stored));
-      }
+      const stored = localStorage.getItem(CREDENTIALS_STORAGE_KEY);
+      if (stored) return JSON.parse(stored);
     } catch (e) {
-      console.warn('Error reading stored credentials:', e);
+      console.warn('Credentials read error, fallback to default', e);
     }
-    return DEFAULT_CREDENTIALS;
+    return JSON.parse(JSON.stringify(DEFAULT_USERS));
   }
 
-  async function sha256(str) {
-    const buffer = new TextEncoder().encode(str);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  function saveUsers(users) {
+    localStorage.setItem(CREDENTIALS_STORAGE_KEY, JSON.stringify(users));
   }
 
-  async function updatePassword(username, newPassword) {
-    if (!username || !newPassword) return false;
-    const creds = getCredentials();
-    if (!creds[username]) return false;
-    const hash = await sha256(newPassword);
-    creds[username].passwordHash = hash;
-    localStorage.setItem(CREDENTIALS_KEY, JSON.stringify(creds));
-    
-    // Notify cloud backend if configured
-    if (typeof window !== 'undefined' && window.ApiModule && typeof window.ApiModule.pushPasswordUpdate === 'function') {
-      window.ApiModule.pushPasswordUpdate(username, hash);
+  async function login(username, password) {
+    const users = getUsers();
+    const user = users[username];
+    if (!user) return { success: false, message: 'Account not found. Please select Admin or Rudra.' };
+
+    const inputHash = await sha256(password);
+    if (inputHash !== user.passHash) {
+      return { success: false, message: 'Invalid password. Please enter the correct password.' };
     }
-    return true;
+
+    // Generate secure session token
+    const token = 'TOK_' + username + '_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+
+    const session = {
+      username: username,
+      displayName: user.name,
+      role: user.role,
+      permissions: user.permissions,
+      token: token,
+      loginTime: Date.now(),
+      lastActive: Date.now()
+    };
+
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+    resetInactivityWatchdog();
+    return { success: true, session: session };
   }
 
-  function init() {
-    setupActivityListeners();
-    checkExistingSession();
-  }
-
-  function checkExistingSession() {
+  function getCurrentUser() {
     try {
-      const stored = sessionStorage.getItem(AUTH_STORAGE_KEY);
-      if (stored) {
-        const session = JSON.parse(stored);
-        if (session && session.username && session.expiry > Date.now()) {
-          currentUser = session;
-          startInactivityTimer();
-          onLoginSuccess(currentUser, false);
-          return;
-        }
+      const sessionStr = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (!sessionStr) return null;
+      const session = JSON.parse(sessionStr);
+      if (Date.now() - session.lastActive > INACTIVITY_TIMEOUT_MS) {
+        logout();
+        return null;
       }
+      session.lastActive = Date.now();
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+      return session;
     } catch (e) {
-      console.warn('Session check error:', e);
+      return null;
     }
-    showLoginScreen();
   }
+
+  function isAdmin() {
+    const user = getCurrentUser();
+    return user && user.role === 'ADMIN';
+  }
+
+  function hasPermission(permission) {
+    const user = getCurrentUser();
+    if (!user) return false;
+    return user.permissions && user.permissions.includes(permission);
+  }
+
+  function logout() {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    window.location.reload();
+  }
+
+  async function updatePassword(username, newPlainPassword) {
+    const users = getUsers();
+    if (!users[username]) return { success: false, message: 'User does not exist.' };
+    if (!newPlainPassword || newPlainPassword.length < 4) {
+      return { success: false, message: 'Password must be at least 4 characters long.' };
+    }
+    users[username].passHash = await sha256(newPlainPassword);
+    saveUsers(users);
+    return { success: true, message: 'Password updated successfully!' };
+  }
+
+  function resetInactivityWatchdog() {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(() => {
+      alert('Your session has timed out after 10 minutes of inactivity to protect financial records.');
+      logout();
+    }, INACTIVITY_TIMEOUT_MS);
+  }
+
+  function initActivityListeners() {
+    if (typeof window !== 'undefined') {
+      ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(evt => {
+        window.addEventListener(evt, () => {
+          const user = getCurrentUser();
+          if (user) resetInactivityWatchdog();
+        }, { passive: true });
+      });
+    }
+  }
+
+  initActivityListeners();
 
   function selectLoginUser(username) {
     const adminBtn = document.getElementById('userBtnAdmin');
     const rudraBtn = document.getElementById('userBtnRudra');
-    const hiddenUser = document.getElementById('loginSelectedUser');
+    const hiddenInput = document.getElementById('loginSelectedUser');
     const pwdInput = document.getElementById('loginPassword');
+
+    if (hiddenInput) hiddenInput.value = username;
 
     if (username === 'Admin') {
       if (adminBtn) adminBtn.classList.add('active');
       if (rudraBtn) rudraBtn.classList.remove('active');
-      if (hiddenUser) hiddenUser.value = 'Admin';
       if (pwdInput) pwdInput.placeholder = 'Enter password for Admin';
     } else {
       if (adminBtn) adminBtn.classList.remove('active');
       if (rudraBtn) rudraBtn.classList.add('active');
-      if (hiddenUser) hiddenUser.value = 'Rudra';
       if (pwdInput) pwdInput.placeholder = 'Enter password for Rudra';
     }
+    if (pwdInput) pwdInput.focus();
+  }
 
-    const errDiv = document.getElementById('loginErrorMsg');
-    if (errDiv) errDiv.style.display = 'none';
-    if (pwdInput) {
-      pwdInput.value = '';
-      pwdInput.focus();
+  function togglePasswordVisibility() {
+    const pwdInput = document.getElementById('loginPassword');
+    const btn = document.getElementById('togglePasswordBtn');
+    if (!pwdInput) return;
+    if (pwdInput.type === 'password') {
+      pwdInput.type = 'text';
+      if (btn) btn.textContent = '🔒';
+    } else {
+      pwdInput.type = 'password';
+      if (btn) btn.textContent = '👁️';
     }
   }
 
   async function handleLogin(e) {
     if (e && e.preventDefault) e.preventDefault();
-
-    const selectedUser = (document.getElementById('loginSelectedUser') || {}).value || 'Admin';
+    const hiddenInput = document.getElementById('loginSelectedUser');
     const pwdInput = document.getElementById('loginPassword');
-    const errDiv = document.getElementById('loginErrorMsg');
-    const submitBtn = document.getElementById('loginSubmitBtn');
+    const errBox = document.getElementById('loginErrorMsg');
 
-    if (!pwdInput) return;
-    const password = pwdInput.value.trim();
+    const username = (hiddenInput && hiddenInput.value) ? hiddenInput.value.trim() : 'Admin';
+    const password = (pwdInput && pwdInput.value) ? pwdInput.value : '';
 
-    if (!password) {
-      showError('Please enter your password.');
+    if (errBox) {
+      errBox.style.display = 'none';
+      errBox.textContent = '';
+    }
+
+    const res = await login(username, password);
+    if (!res.success) {
+      if (errBox) {
+        errBox.textContent = res.message || 'Authentication failed.';
+        errBox.style.display = 'block';
+      } else {
+        alert(res.message || 'Authentication failed.');
+      }
       return;
     }
 
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Verifying...';
+    const loginModal = document.getElementById('loginModal');
+    const appShell = document.getElementById('appShell');
+    if (loginModal) loginModal.style.display = 'none';
+    if (appShell) appShell.style.display = 'block';
+
+    if (typeof AppModule !== 'undefined' && typeof AppModule.init === 'function') {
+      AppModule.init();
     }
-
-    try {
-      const inputHash = await sha256(password);
-      const creds = getCredentials();
-      const targetUser = creds[selectedUser];
-
-      if (!targetUser || inputHash !== targetUser.passwordHash) {
-        // Strict security: generic error, no hints
-        showError('Invalid username or password. Access denied.');
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = '🚀 Secure Login';
-        }
-        return;
-      }
-
-      // Login Verified
-      currentUser = {
-        username: targetUser.username,
-        displayName: targetUser.displayName,
-        role: targetUser.role,
-        permissions: targetUser.permissions,
-        loginTime: Date.now(),
-        expiry: Date.now() + (24 * 60 * 60 * 1000) // 24hr session
-      };
-
-      sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(currentUser));
-      startInactivityTimer();
-
-      // Show welcome splash overlay
-      showWelcomeSplash(currentUser);
-
-    } catch (err) {
-      console.error('Authentication exception:', err);
-      showError('Authentication system error. Please try again.');
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = '🚀 Secure Login';
-      }
-    }
-  }
-
-  function showError(msg) {
-    const errDiv = document.getElementById('loginErrorMsg');
-    if (errDiv) {
-      errDiv.textContent = msg;
-      errDiv.style.display = 'block';
-    }
-  }
-
-  function showWelcomeSplash(user) {
-    const splash = document.getElementById('welcomeSplashOverlay');
-    const greeting = document.getElementById('welcomeSplashGreeting');
-    const status = document.getElementById('welcomeSplashStatus');
-
-    if (greeting) greeting.textContent = `👋 Welcome, ${user.displayName}!`;
-    if (status) status.textContent = 'Authenticating credentials & loading verified financial records...';
-    if (splash) splash.style.display = 'flex';
-
-    setTimeout(() => {
-      if (status) status.textContent = 'Synchronizing Fleet P&L & Driver settlement ledgers...';
-    }, 600);
-
-    setTimeout(() => {
-      if (splash) splash.style.display = 'none';
-      onLoginSuccess(user, true);
-    }, 1200);
-  }
-
-  function onLoginSuccess(user, isFresh) {
-    const authWrapper = document.getElementById('authWrapper');
-    const appWrapper = document.getElementById('appWrapper');
-
-    if (authWrapper) authWrapper.style.display = 'none';
-    if (appWrapper) appWrapper.style.display = 'flex';
-
-    // Update UI Elements
-    const curUserDisplay = document.getElementById('currentUserDisplay');
-    const curRoleBadge = document.getElementById('currentUserRoleBadge');
-    const drawerUserName = document.getElementById('drawerUserName');
-    const drawerUserRole = document.getElementById('drawerUserRole');
-
-    if (curUserDisplay) curUserDisplay.textContent = user.displayName;
-    if (curRoleBadge) {
-      curRoleBadge.textContent = user.role;
-      curRoleBadge.className = 'user-role-badge ' + (user.role === 'ADMIN' ? 'role-admin' : 'role-user');
-    }
-    if (drawerUserName) drawerUserName.textContent = user.displayName;
-    if (drawerUserRole) drawerUserRole.textContent = user.role;
-
-    // RBAC: Show/Hide Admin-only elements
-    const isAdmin = user.role === 'ADMIN';
-    const adminElements = document.querySelectorAll('.admin-only');
-    adminElements.forEach(el => {
-      el.style.display = isAdmin ? '' : 'none';
-    });
-
-    if (window.AppModule && window.AppModule.onUserAuthenticated) {
-      window.AppModule.onUserAuthenticated(user, isFresh);
-    }
-  }
-
-  function showLoginScreen() {
-    currentUser = null;
-    sessionStorage.removeItem(AUTH_STORAGE_KEY);
-    clearInactivityTimer();
-
-    const authWrapper = document.getElementById('authWrapper');
-    const appWrapper = document.getElementById('appWrapper');
-    const pwdInput = document.getElementById('loginPassword');
-    const errDiv = document.getElementById('loginErrorMsg');
-    const submitBtn = document.getElementById('loginSubmitBtn');
-
-    if (appWrapper) appWrapper.style.display = 'none';
-    if (authWrapper) authWrapper.style.display = 'flex';
-    if (pwdInput) pwdInput.value = '';
-    if (errDiv) errDiv.style.display = 'none';
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.textContent = '🚀 Secure Login';
-    }
-  }
-
-  function logout() {
-    showLoginScreen();
-  }
-
-  function togglePasswordVisibility() {
-    const pwdInput = document.getElementById('loginPassword');
-    const toggleBtn = document.getElementById('togglePasswordBtn');
-    if (!pwdInput) return;
-    if (pwdInput.type === 'password') {
-      pwdInput.type = 'text';
-      if (toggleBtn) toggleBtn.textContent = '🔒';
-    } else {
-      pwdInput.type = 'password';
-      if (toggleBtn) toggleBtn.textContent = '👁️';
-    }
-  }
-
-  // 10-Minute Inactivity Tracker
-  function setupActivityListeners() {
-    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
-    const throttledReset = throttle(resetInactivityTimer, 2000);
-    events.forEach(ev => {
-      window.addEventListener(ev, throttledReset, { passive: true });
-    });
-  }
-
-  function startInactivityTimer() {
-    clearInactivityTimer();
-    inactivityTimer = setTimeout(() => {
-      alert('Your session has timed out due to 10 minutes of inactivity. Please log in again.');
-      logout();
-    }, INACTIVITY_TIMEOUT_MS);
-  }
-
-  function resetInactivityTimer() {
-    if (currentUser) {
-      startInactivityTimer();
-    }
-  }
-
-  function clearInactivityTimer() {
-    if (inactivityTimer) {
-      clearTimeout(inactivityTimer);
-      inactivityTimer = null;
-    }
-  }
-
-  function throttle(func, limit) {
-    let inThrottle;
-    return function () {
-      const args = arguments;
-      const context = this;
-      if (!inThrottle) {
-        func.apply(context, args);
-        inThrottle = true;
-        setTimeout(() => (inThrottle = false), limit);
-      }
-    };
-  }
-
-  function getCurrentUser() {
-    return currentUser;
-  }
-
-  function isAdmin() {
-    return currentUser && currentUser.role === 'ADMIN';
   }
 
   return {
-    init,
-    selectLoginUser,
-    handleLogin,
+    login,
     logout,
-    togglePasswordVisibility,
     getCurrentUser,
     isAdmin,
-    updatePassword
+    hasPermission,
+    updatePassword,
+    resetInactivityWatchdog,
+    sha256,
+    selectLoginUser,
+    togglePasswordVisibility,
+    handleLogin
   };
 })();
 
-if (typeof window !== 'undefined') {
-  window.AuthModule = AuthModule;
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = AuthModule;
 }
-

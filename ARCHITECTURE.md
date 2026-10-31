@@ -51,27 +51,53 @@ graph TD
 ## 3. Module Boundaries & Data Contracts
 
 ### 3.1 Data Layer (`js/data.js`)
-- **Key Responsibility:** Manages persistent state, verified seed datasets, and schema versioning.
+- **Key Responsibility:** Manages persistent state, multi-project hierarchy, dynamic fleets, date-based accounting periods, and schema versioning.
 - **Contract:**
   ```javascript
   {
-    version: "1.0.0",
-    lastUpdated: "2026-10-25T...",
-    trucks: [ { id, regNumber, driverName, status } ],
-    TG15T6666: {
-      driver: { name, truckNo, period, commissionRate, oldBalancePayable, roadExpensesClaimed },
-      pl: { period, fastTag, addBlueAndExp, dieselEntries: [], dieselTotal },
-      trips: [ { id, sno, dateRange, from, to, route, pnlFreight, baseFreight, transporter, advanceReceived, balanceFreight, podStatus } ],
-      advances: [ { id, date, location, amount, mode } ],
-      roadExpenses: [ { id, description, category, amount } ]
-    },
-    TS15UE1122: { ... },
-    archive_2026_09: { TG15T6666: { ... }, TS15UE1122: { ... } }
+    version: 2,
+    lastUpdated: "2026-10-31T...",
+    projects: [
+      {
+        id: "PRJ-001",
+        name: "SR Transport Main Fleet",
+        spreadsheetId: "1eZ748Kh9G1yJc5X1F-...", // Isolated Google Spreadsheet ID
+        status: "Active",
+        activePeriod: "2026-10",
+        accountingPeriods: [
+          { id: "2026-09", name: "September 2026", status: "Archived" },
+          { id: "2026-10", name: "October 2026", status: "Active" },
+          { id: "2026-11", name: "November 2026", status: "Planned" }
+        ],
+        trucks: [
+          {
+            id: "TG15T6666",
+            regNumber: "TG15T6666",
+            driverName: "Noor Allam",
+            driverPhone: "+91 98480 12345",
+            status: "Active",
+            fixedExpenses: { fastTag: 40000, addBlueAndMisc: 15000 },
+            settlementParams: {
+              oldBalance: 13800,
+              oldBalanceNote: "OLD BALC SHANKAR WANT PAY",
+              direction: "PAYABLE_TO_DRIVER",
+              claimedRoadExpenses: 28700,
+              itemizedRoadExpenses: 28735,
+              reconciliationDiff: 35
+            },
+            trips: [ { id, date, dates, period, from, to, pnlFreight, baseFreight, advanceReceived, balanceDue } ],
+            diesel: [ { id, date, period, pump, amount } ],
+            driverAdvances: [ { id, date, period, location, amount, mode } ],
+            roadExpenses: [ { id, date, period, desc, amount, category } ]
+          }
+        ]
+      }
+    ]
   }
   ```
 
 ### 3.2 Calculation Engine (`js/calculations.js`)
-- **Key Responsibility:** Pure functional calculation engine with no UI side-effects.
+- **Key Responsibility:** Pure functional calculation engine with date/period filtering and dynamic multi-truck support.
 - **Mathematical Formulations:**
   1. **Freight Revenue ($P_1$):**
      $$P_1 = \sum \text{trip.pnlFreight}$$
@@ -82,8 +108,9 @@ graph TD
   4. **Net Operating Profit:**
      $$\text{Profit} = P_1 - P_2$$
   5. **Noor Allam Settlement (`TG15T6666`):**
-     $$\text{Credit} = \text{Salary (40,740)} + \text{Old Balance (13,800)} + \text{Expenses (28,700)} = 83,240$$
+     $$\text{Credit} = \text{Salary (40,740)} + \text{Old Balance (13,800)} + \text{Claimed Expenses (28,700)} = 83,240$$
      $$\text{Net Balance} = \text{Credit (83,240)} - \text{Advances (78,200)} = \mathbf{5,040} \quad (\text{Payable by Shankar})$$
+     $$\text{Audit Variance} = |28,735 - 28,700| = \mathbf{₹35} \quad (\text{Documented explicitly})$$
   6. **Allam Brother Settlement (`TS15UE1122`):**
      $$\text{Advance Surplus} = \text{Advances (41,500)} - \text{Expenses (11,790)} - \text{Salary (23,880)} = 5,830$$
      $$\text{Net Balance} = \text{Surplus (5,830)} + \text{Old Balance (62,340)} = \mathbf{68,170} \quad (\text{Payable to Shankar})$$

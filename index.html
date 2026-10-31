@@ -132,13 +132,17 @@
         <span class="drawer-item-icon">🔄</span>
         <span>Sync Cloud Database</span>
       </button>
+      <button class="drawer-nav-item admin-only" onclick="ApiModule.openGoogleSheet(); AppModule.closeSidebar();">
+        <span class="drawer-item-icon">📊</span>
+        <span>Open Dedicated Google Sheet</span>
+      </button>
       <button class="drawer-nav-item" onclick="TableModule.exportToExcel(); AppModule.closeSidebar();">
         <span class="drawer-item-icon">📥</span>
         <span>Export Excel (.xlsx)</span>
       </button>
-      <button class="drawer-nav-item" onclick="AppModule.openSettingsModal(); AppModule.closeSidebar();">
+      <button class="drawer-nav-item admin-only" onclick="AppModule.openSettingsModal(); AppModule.closeSidebar();">
         <span class="drawer-item-icon">⚙️</span>
-        <span>Settings &amp; API</span>
+        <span>Settings &amp; API (Admin)</span>
       </button>
       <button class="drawer-nav-item admin-only" onclick="AppModule.restoreOriginalData();">
         <span class="drawer-item-icon">📋</span>
@@ -183,6 +187,13 @@
           <h1>Transport Brokerage Ledger</h1>
           <span>Fleet Logistics &amp; Financial Accounts Management</span>
         </div>
+        <!-- Project Switcher & Creator -->
+        <div class="project-selector-wrapper" style="margin-left: 1.25rem; display: flex; align-items: center; gap: 0.4rem;">
+          <select id="projectSelectDropdown" class="form-control" onchange="AppModule.selectProject(this.value)" style="font-size: 0.82rem; font-weight: 600; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.35rem 0.6rem; cursor: pointer;"></select>
+          <button class="btn btn-xs btn-outline admin-only" onclick="AppModule.openAddProjectModal()" title="Create New Isolated Project" style="white-space: nowrap; font-size: 0.76rem; padding: 0.3rem 0.5rem;">
+            ＋ Project
+          </button>
+        </div>
       </div>
 
       <!-- Navigation Tabs (Center) -->
@@ -216,32 +227,57 @@
     </header>
 
     <!-- Sub-Header Filter & Action Toolbar -->
-    <div class="app-sub-toolbar">
-      <!-- Truck Selector Filter Pills -->
-      <div class="truck-filter-group">
-        <span class="filter-label">Filter Truck:</span>
-        <button id="pillFilterAll" class="truck-pill-btn active" onclick="AppModule.selectTruckFilter('ALL')">
-          🚛 All Fleet Combined
-        </button>
-        <button id="pillFilter6666" class="truck-pill-btn" onclick="AppModule.selectTruckFilter('TG15T6666')">
-          🚛 TG15T6666 (Noor Allam)
-        </button>
-        <button id="pillFilter1122" class="truck-pill-btn" onclick="AppModule.selectTruckFilter('TS15UE1122')">
-          🚛 TS15UE1122 (Allam Brother)
-        </button>
+    <div class="app-sub-toolbar" style="display: flex; flex-direction: column; gap: 0.75rem; padding: 0.75rem 1.25rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 0.75rem;">
+        <!-- Dynamic Truck Selector Filter Pills -->
+        <div class="truck-filter-group" id="truckFilterPillsContainer" style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+          <!-- Dynamically populated by AppModule.renderTruckFilterPills() -->
+        </div>
+
+        <!-- Right Action Buttons -->
+        <div class="toolbar-right-actions" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+          <button class="btn btn-primary" onclick="AppModule.openAddModal('trip')">
+            <span style="font-size: 1.1rem; line-height: 1;">＋</span> Add Shipment
+          </button>
+          <button class="btn btn-secondary" onclick="TableModule.exportToExcel()" title="Download genuine Excel .xlsx with preserved formulas">
+            📥 Export Excel (.xlsx)
+          </button>
+          <button class="btn btn-secondary admin-only" onclick="ApiModule.openGoogleSheet()" title="Open Dedicated Google Sheet (Admin Only)">
+            📊 Open Sheet
+          </button>
+          <button class="btn btn-secondary sync-trigger-btn" onclick="AppModule.syncNow()" title="Sync Cloud Ledger">
+            🔄 Sync
+          </button>
+          <button class="btn btn-secondary admin-only" onclick="AppModule.openSettingsModal()" title="Cloud Ledger &amp; Sheet Settings (Admin Only)">
+            ⚙️
+          </button>
+        </div>
       </div>
 
-      <!-- Right Action Buttons -->
-      <div class="toolbar-right-actions">
-        <button class="btn btn-primary" onclick="AppModule.openAddModal('trip')">
-          <span style="font-size: 1.1rem; line-height: 1;">＋</span> Add Shipment
-        </button>
-        <button class="btn btn-secondary" onclick="TableModule.exportToExcel()" title="Download genuine Excel .xlsx with preserved formulas">
-          📥 Export Excel (.xlsx)
-        </button>
-        <button class="btn btn-secondary sync-trigger-btn" onclick="AppModule.syncNow()" title="Sync Cloud Ledger">
-          🔄 Sync
-        </button>
+      <!-- Date Range, Accounting Period & Live Search Filter Row -->
+      <div class="filter-controls-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.5rem 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+          <span style="font-size: 0.8rem; font-weight: 600; color: #475569;">📅 Period:</span>
+          <select id="filterPeriodSelect" class="form-control" onchange="AppModule.selectPeriodFilter(this.value)" style="font-size: 0.82rem; padding: 0.25rem 0.5rem; border-radius: 4px; width: auto;">
+            <option value="2026-10" selected>October 2026 (Active)</option>
+            <option value="2026-09">September 2026 (Archived)</option>
+            <option value="2026-11">November 2026 (Planned)</option>
+            <option value="ALL">All Financial Periods</option>
+          </select>
+
+          <span style="font-size: 0.8rem; font-weight: 600; color: #475569; margin-left: 0.5rem;">From:</span>
+          <input type="date" id="filterStartDate" class="form-control" style="font-size: 0.82rem; padding: 0.2rem 0.4rem; width: 135px;">
+          <span style="font-size: 0.8rem; font-weight: 600; color: #475569;">To:</span>
+          <input type="date" id="filterEndDate" class="form-control" style="font-size: 0.82rem; padding: 0.2rem 0.4rem; width: 135px;">
+          <button class="btn btn-sm btn-secondary" onclick="AppModule.applyCustomDateFilter()">Filter Date</button>
+          <button class="btn btn-sm btn-outline" onclick="AppModule.resetFilters()">Reset</button>
+        </div>
+
+        <!-- Live Search Input -->
+        <div style="display: flex; align-items: center; gap: 0.4rem;">
+          <span style="font-size: 0.8rem; color: #64748b;">🔍</span>
+          <input type="text" id="filterSearchInput" class="form-control" placeholder="Search route, pump, driver..." oninput="AppModule.applySearch(this.value)" style="font-size: 0.82rem; width: 220px; padding: 0.25rem 0.5rem;">
+        </div>
       </div>
     </div>
 
@@ -412,25 +448,75 @@
     </div>
   </div>
 
-  <!-- 6. SETTINGS MODAL -->
-  <div id="settingsModal" class="app-modal-overlay" style="display: none;">
-    <div class="app-modal-card">
+  <!-- 6. SETTINGS MODAL (ADMIN ONLY) -->
+  <div id="settingsModal" class="app-modal-overlay admin-only" style="display: none;">
+    <div class="app-modal-card" style="max-width: 650px;">
       <div class="modal-header">
-        <h3>⚙️ Cloud Ledger &amp; System Settings</h3>
+        <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 1.15rem;">
+          ⚙️ Cloud Ledger &amp; System Settings
+          <span style="background: #1e3a8a; color: #ffffff; font-size: 0.7rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 4px; letter-spacing: 0.5px;">ADMIN ONLY</span>
+        </h3>
         <button class="modal-close-btn" onclick="AppModule.closeModal()">✕</button>
       </div>
       <form onsubmit="AppModule.saveSettings(event)">
         <div class="modal-body">
-          <div class="form-group">
-            <label for="settingGasEndpoint">Google Apps Script Web App URL</label>
-            <input type="url" id="settingGasEndpoint" class="form-control" placeholder="https://script.google.com/macros/s/.../exec">
-            <small style="color: #64748b; font-size: 0.74rem; display: block; margin-top: 0.35rem;">
-              Endpoint used for real-time synchronization with Google Sheets backend.
+          <!-- Administrator Privilege Alert -->
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.8rem; color: #1e40af; line-height: 1.5;">
+            🛡️ <strong>Restricted Administrator View:</strong> These production Google Cloud links and settings are visible and accessible strictly to <strong>Admin (Shravan Kumar)</strong>. Standard operators (Rudra) are blocked from accessing or viewing backend infrastructure URLs.
+          </div>
+
+          <!-- Quick Access Action Buttons for Live Google Cloud Assets -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem; margin-bottom: 1.25rem;">
+            <div style="font-size: 0.78rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 0.65rem;">
+              🚀 Verified Production Google Cloud Assets
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+              <a href="https://docs.google.com/spreadsheets/d/1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4/edit?usp=sharing" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="text-decoration: none; color: #065f46; background: #ecfdf5; border-color: #a7f3d0; font-weight: 600;">
+                📊 Google Sheet ↗
+              </a>
+              <a href="https://script.google.com/u/0/home/projects/1l4GkXJ-eiX-SzyeGlfBMWc-H32sE2ubeNnq_LDEDXqMtYhU6b4Zls8bL/edit" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="text-decoration: none; color: #1e40af; background: #eff6ff; border-color: #bfdbfe; font-weight: 600;">
+                ⚡ Apps Script Project ↗
+              </a>
+              <a href="https://script.google.com/macros/s/AKfycbwREdyxaW64mixcHfFNyspj_KD_jxYYryQWjRukjPiBxdjkNoG0tguD0vaPW0n0cMcinQ/exec" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="text-decoration: none; color: #6b21a8; background: #faf5ff; border-color: #e9d5ff; font-weight: 600;">
+                🌐 Web App API Endpoint ↗
+              </a>
+            </div>
+            <div style="margin-top: 0.65rem; font-size: 0.72rem; color: #64748b; line-height: 1.4;">
+              <strong>Active Deployment:</strong> Version 1 (31 Oct 2026, 19:28) • <strong>ID:</strong> <code style="font-size: 0.72rem; background: #e2e8f0; padding: 1px 4px; border-radius: 3px;">AKfycbwREdyxaW64mixcHfFNyspj_KD_jxYYryQWjRukjPiBxdjkNoG0tguD0vaPW0n0cMcinQ</code>
+            </div>
+          </div>
+
+          <!-- Configurable Inputs -->
+          <div class="form-group" style="margin-bottom: 1.1rem;">
+            <label for="settingSheetUrl" style="font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 0.35rem; display: block;">
+              Dedicated Google Sheet URL (Cloud Spreadsheet)
+            </label>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <input type="url" id="settingSheetUrl" class="form-control" placeholder="https://docs.google.com/spreadsheets/d/.../edit" style="font-size: 0.85rem;">
+              <button type="button" class="btn btn-secondary" onclick="ApiModule.openGoogleSheet()" style="white-space: nowrap; font-size: 0.82rem;">
+                🔗 Open
+              </button>
+            </div>
+            <small style="color: #64748b; font-size: 0.74rem; display: block; margin-top: 0.3rem;">
+              Dedicated Google Sheet ID: <code>1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4</code>
             </small>
           </div>
+
+          <div class="form-group" style="margin-bottom: 1.1rem;">
+            <label for="settingGasEndpoint" style="font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 0.35rem; display: block;">
+              Google Apps Script Web App URL
+            </label>
+            <input type="url" id="settingGasEndpoint" class="form-control" placeholder="https://script.google.com/macros/s/.../exec" style="font-size: 0.85rem;">
+            <small style="color: #64748b; font-size: 0.74rem; display: block; margin-top: 0.3rem;">
+              Production Web App used for real-time synchronization with Google Sheets backend.
+            </small>
+          </div>
+
           <div class="form-group" style="margin-top: 1.25rem; border-top: 1px solid #e2e8f0; padding-top: 1rem;">
-            <label>Master Data Reset (Admin Only)</label>
-            <button type="button" class="btn btn-secondary" onclick="AppModule.restoreOriginalData()" style="color: #b91c1c;">
+            <label style="font-weight: 600; font-size: 0.85rem; color: #b91c1c; margin-bottom: 0.35rem; display: block;">
+              Master Excel Data Reset (Admin Authorization Required)
+            </label>
+            <button type="button" class="btn btn-secondary" onclick="AppModule.restoreOriginalData()" style="color: #b91c1c; border-color: #fca5a5; font-size: 0.82rem;">
               📋 Re-seed Verified Original Excel Data
             </button>
           </div>

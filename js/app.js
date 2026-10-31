@@ -1,329 +1,302 @@
 /**
- * Fleet Logistics & Financial Accounts Management - App Controller
- * Orchestrates views, sidebar drawer, truck filters, modals, full CRUD, and toasts
- * Developed by Shravan Kumar • 2026
+ * Transport Brokerage Ledger Pvt Ltd
+ * Main Application Orchestrator & State Controller (P2)
+ *
+ * Implements:
+ * - Multi-Project Management & Switching
+ * - Dynamic Unlimited Truck Filter & Fleet Registry
+ * - Comprehensive Date & Accounting Period Filtering
+ * - Authoritative View Coordination (Dashboard, P&L, Driver, Live Replica)
+ * - Full CRUD Operations with Strict RBAC Delete Guards (Rudra Safeguard)
+ * - Real-Time Bidirectional Cloud Synchronization
  */
 
 const AppModule = (function () {
   'use strict';
 
+  // State
   let currentView = 'dashboard';
   let currentTruckFilter = 'ALL';
-  let currentMonthFilter = '2026-10';
+  let currentPeriodFilter = '2026-10'; // Default active accounting month
+  let customStartDate = '';
+  let customEndDate = '';
+  let currentSearchQuery = '';
 
-  // Edit State Tracking
-  let isEditing = false;
-  let editingRecordType = null;
-  let editingTruckId = null;
+  let activeModalType = 'trip';
   let editingRecordId = null;
+  let editingTruckId = null;
 
   function init() {
-    DataModule.init();
-    AuthModule.init();
-    ApiModule.init();
-
-    setupGlobalEventListeners();
+    checkAuthSession();
+    renderProjectSelector();
+    renderTruckFilterPills();
     renderCurrentView();
+    setupEventListeners();
   }
 
-  function setupGlobalEventListeners() {
-    // Keyboard Escape key handling
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        closeSidebar();
-        closeModal();
-        const viewExcel = document.getElementById('view-excel');
-        if (viewExcel && viewExcel.classList.contains('sheet-fullscreen-mode')) {
-          TableModule.toggleFullscreen();
-        }
-      }
-    });
-  }
+  function checkAuthSession() {
+    const user = AuthModule.getCurrentUser();
+    const loginModal = document.getElementById('loginModal');
+    const appShell = document.getElementById('appShell');
 
-  function onUserAuthenticated(user, isFresh) {
-    renderCurrentView();
-    if (isFresh) {
-      showToast(`Welcome back, ${user.displayName}! Fleet accounts loaded.`, 'success');
+    if (!user) {
+      if (loginModal) loginModal.style.display = 'flex';
+      if (appShell) appShell.style.display = 'none';
+    } else {
+      if (loginModal) loginModal.style.display = 'none';
+      if (appShell) appShell.style.display = 'block';
+      updateUserBadge(user);
     }
   }
 
-  function switchView(viewName) {
-    currentView = viewName;
-
-    // Toggle View Sections
-    const views = ['dashboard', 'pnl', 'driver', 'excel'];
-    views.forEach(v => {
-      const el = document.getElementById(`view-${v}`);
-      if (el) {
-        el.style.display = (v === viewName) ? 'block' : 'none';
-      }
+  function updateUserBadge(user) {
+    const nameEl = document.getElementById('currentUserDisplay');
+    const roleEl = document.getElementById('currentUserRoleBadge');
+    if (nameEl) nameEl.textContent = user.displayName || user.name || user.username;
+    if (roleEl) {
+      roleEl.textContent = user.role;
+      roleEl.className = 'user-role-badge ' + (user.role === 'ADMIN' ? 'role-admin' : 'role-user');
+    }
+    // Update admin-only elements visibility
+    const adminElements = document.querySelectorAll('.admin-only');
+    adminElements.forEach(el => {
+      el.style.display = (user.role === 'ADMIN') ? '' : 'none';
     });
-
-    // Update Top Navbar Buttons
-    const navButtons = {
-      dashboard: 'btnNavDashboard',
-      pnl: 'btnNavPnl',
-      driver: 'btnNavDriver',
-      excel: 'btnNavExcel'
-    };
-    Object.keys(navButtons).forEach(k => {
-      const btn = document.getElementById(navButtons[k]);
-      if (btn) {
-        if (k === viewName) btn.classList.add('active');
-        else btn.classList.remove('active');
-      }
-    });
-
-    // Update Drawer Menu Items
-    const drawerNavs = {
-      dashboard: 'drawerNavDashboard',
-      pnl: 'drawerNavPnl',
-      driver: 'drawerNavDriver',
-      excel: 'drawerNavExcel'
-    };
-    Object.keys(drawerNavs).forEach(k => {
-      const dBtn = document.getElementById(drawerNavs[k]);
-      if (dBtn) {
-        if (k === viewName) dBtn.classList.add('active');
-        else dBtn.classList.remove('active');
-      }
-    });
-
-    renderCurrentView();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function renderCurrentView() {
-    if (currentView === 'dashboard') {
-      DashboardModule.render();
-    } else if (currentView === 'pnl') {
-      TableModule.renderPnlView(currentTruckFilter);
-    } else if (currentView === 'driver') {
-      TableModule.renderDriverView(currentTruckFilter === 'ALL' ? 'TG15T6666' : currentTruckFilter);
-    } else if (currentView === 'excel') {
-      TableModule.renderExcelReplica();
+  // --- Dynamic Project & Truck Filters ---
+  function renderProjectSelector() {
+    const selector = document.getElementById('projectSelectDropdown');
+    if (!selector) return;
+
+    const projects = DataModule.getProjects();
+    const curId = DataModule.getCurrentProjectId();
+
+    selector.innerHTML = projects.map(p => `
+      <option value="${p.id}" ${p.id === curId ? 'selected' : ''}>
+        📁 ${ApiModule.escapeHtml(p.name)} (${p.status})
+      </option>
+    `).join('');
+  }
+
+  function selectProject(projectId) {
+    DataModule.setCurrentProjectId(projectId);
+    currentTruckFilter = 'ALL';
+    const curPrj = DataModule.getCurrentProject();
+    currentPeriodFilter = curPrj.activePeriod || '2026-10';
+    renderProjectSelector();
+    renderTruckFilterPills();
+    renderCurrentView();
+    showToast(`Switched to project: ${curPrj.name}`, 'info');
+  }
+
+  function renderTruckFilterPills() {
+    const container = document.getElementById('truckFilterPillsContainer');
+    if (!container) return;
+
+    const trucks = DataModule.getTrucks();
+
+    let pillsHtml = `
+      <button class="truck-pill-btn ${currentTruckFilter === 'ALL' ? 'active' : ''}" onclick="AppModule.selectTruckFilter('ALL')">
+        🚛 All Fleet Combined
+      </button>
+    `;
+
+    trucks.forEach(t => {
+      pillsHtml += `
+        <button class="truck-pill-btn ${currentTruckFilter === t.id ? 'active' : ''}" onclick="AppModule.selectTruckFilter('${t.id}')">
+          🚛 ${ApiModule.escapeHtml(t.regNumber || t.id)} (${ApiModule.escapeHtml(t.driverName)})
+        </button>
+      `;
+    });
+
+    // Add Truck Shortcut Button
+    pillsHtml += `
+      <button class="btn btn-sm btn-outline admin-only" onclick="AppModule.openAddTruckModal()" style="margin-left: 0.5rem;" title="Register new truck">
+        ＋ New Truck
+      </button>
+    `;
+
+    container.innerHTML = pillsHtml;
+
+    // Refresh admin visibility
+    const user = AuthModule.getCurrentUser();
+    if (user && user.role !== 'ADMIN') {
+      container.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
     }
   }
 
   function selectTruckFilter(truckId) {
     currentTruckFilter = truckId;
+    renderTruckFilterPills();
+    renderCurrentView();
+  }
 
-    // Update Pill Buttons
-    const pills = {
-      ALL: 'pillFilterAll',
-      TG15T6666: 'pillFilter6666',
-      TS15UE1122: 'pillFilter1122'
-    };
-    Object.keys(pills).forEach(k => {
-      const btn = document.getElementById(pills[k]);
+  function selectPeriodFilter(period) {
+    currentPeriodFilter = period;
+    customStartDate = '';
+    customEndDate = '';
+    const dateInputStart = document.getElementById('filterStartDate');
+    const dateInputEnd = document.getElementById('filterEndDate');
+    if (dateInputStart) dateInputStart.value = '';
+    if (dateInputEnd) dateInputEnd.value = '';
+    renderCurrentView();
+  }
+
+  function applyCustomDateFilter() {
+    const start = document.getElementById('filterStartDate') ? document.getElementById('filterStartDate').value : '';
+    const end = document.getElementById('filterEndDate') ? document.getElementById('filterEndDate').value : '';
+    if (!start && !end) {
+      alert("Please select at least a Start Date or End Date.");
+      return;
+    }
+    customStartDate = start;
+    customEndDate = end;
+    currentPeriodFilter = 'CUSTOM';
+    renderCurrentView();
+    showToast(`Date filter applied: ${start || 'Beginning'} to ${end || 'Present'}`, 'info');
+  }
+
+  function resetFilters() {
+    const curPrj = DataModule.getCurrentProject();
+    currentTruckFilter = 'ALL';
+    currentPeriodFilter = curPrj.activePeriod || '2026-10';
+    customStartDate = '';
+    customEndDate = '';
+    currentSearchQuery = '';
+
+    const startInput = document.getElementById('filterStartDate');
+    const endInput = document.getElementById('filterEndDate');
+    const searchInput = document.getElementById('filterSearchInput');
+    const periodSelect = document.getElementById('filterPeriodSelect');
+
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
+    if (searchInput) searchInput.value = '';
+    if (periodSelect) periodSelect.value = currentPeriodFilter;
+
+    renderTruckFilterPills();
+    renderCurrentView();
+    showToast('Filters reset to default.', 'info');
+  }
+
+  function applySearch(query) {
+    currentSearchQuery = query;
+    renderCurrentView();
+  }
+
+  // --- View Switching ---
+  function switchView(viewName) {
+    currentView = viewName;
+    ['dashboard', 'pnl', 'driver', 'excel'].forEach(v => {
+      const el = document.getElementById('view-' + v);
+      const btn = document.getElementById('btnNav' + v.charAt(0).toUpperCase() + v.slice(1));
+      if (el) el.style.display = (v === viewName) ? 'block' : 'none';
       if (btn) {
-        if (k === truckId) btn.classList.add('active');
+        if (v === viewName) btn.classList.add('active');
         else btn.classList.remove('active');
       }
     });
 
     renderCurrentView();
+    closeSidebar();
   }
 
-  function selectMonthFilter(monthId) {
-    currentMonthFilter = monthId;
-    renderCurrentView();
-  }
+  function renderCurrentView() {
+    const filterOptions = {
+      truckId: currentTruckFilter,
+      period: currentPeriodFilter,
+      startDate: customStartDate,
+      endDate: customEndDate,
+      searchQuery: currentSearchQuery
+    };
 
-  function getCurrentTruckFilter() {
-    return currentTruckFilter;
-  }
-
-  // Sidebar Drawer Controls
-  function toggleSidebar(e) {
-    if (e && e.stopPropagation) e.stopPropagation();
-    const drawer = document.getElementById('appDrawer');
-    if (!drawer) return;
-
-    if (drawer.classList.contains('open')) {
-      closeSidebar();
-    } else {
-      openSidebar();
+    if (currentView === 'dashboard') {
+      DashboardModule.render(filterOptions);
+    } else if (currentView === 'pnl') {
+      TableModule.renderPnlView(currentTruckFilter, filterOptions);
+    } else if (currentView === 'driver') {
+      TableModule.renderDriverView(currentTruckFilter, filterOptions);
+    } else if (currentView === 'excel') {
+      TableModule.renderExcelReplica();
     }
   }
 
-  function openSidebar() {
-    const drawer = document.getElementById('appDrawer');
-    const backdrop = document.getElementById('drawerBackdrop');
-    if (drawer) drawer.classList.add('open');
-    if (backdrop) backdrop.classList.add('open');
-    document.body.style.overflow = 'hidden';
-  }
-
-  function closeSidebar() {
-    const drawer = document.getElementById('appDrawer');
-    const backdrop = document.getElementById('drawerBackdrop');
-    if (drawer) drawer.classList.remove('open');
-    if (backdrop) backdrop.classList.remove('open');
-    document.body.style.overflow = '';
-  }
-
-  // Modal Dialogs & CRUD Operations
-  function openAddModal(type = 'trip', targetTruck = null) {
-    isEditing = false;
-    editingRecordType = null;
-    editingTruckId = null;
+  // --- Add / Edit Record Modals ---
+  function openAddModal(type, defaultTruckId) {
+    activeModalType = type || 'trip';
     editingRecordId = null;
+    editingTruckId = defaultTruckId || (currentTruckFilter !== 'ALL' ? currentTruckFilter : 'TG15T6666');
 
     const modal = document.getElementById('addEntryModal');
     const title = document.getElementById('addModalTitle');
-    const truckSelect = document.getElementById('modalTruckSelect');
     const typeSelect = document.getElementById('modalEntryType');
+    const truckSelect = document.getElementById('modalTruckSelect');
     const submitBtn = document.getElementById('modalSubmitBtn');
 
-    if (truckSelect) {
-      truckSelect.value = targetTruck || (currentTruckFilter === 'ALL' ? 'TG15T6666' : currentTruckFilter);
-      truckSelect.disabled = false;
-    }
+    if (title) title.textContent = '➕ Add Financial Record';
+    if (submitBtn) submitBtn.textContent = 'Save Record';
     if (typeSelect) {
-      typeSelect.value = type;
+      typeSelect.value = activeModalType;
       typeSelect.disabled = false;
-      toggleModalFields(type);
     }
 
-    if (title) {
-      if (type === 'trip') title.textContent = '➕ Add New Freight Shipment Trip';
-      else if (type === 'diesel') title.textContent = '⛽ Record Diesel Fuel Slip';
-      else if (type === 'advance') title.textContent = '💵 Record Driver Advance Payment';
-      else if (type === 'expense') title.textContent = '🚨 Record En-Route Road Expense';
-      else title.textContent = '➕ Add Financial Entry';
-    }
-
-    if (submitBtn) submitBtn.textContent = 'Save Entry';
-
-    // Reset Inputs
-    clearModalInputs();
+    populateModalTruckOptions(editingTruckId);
+    toggleModalFields(activeModalType);
+    clearModalFields();
 
     if (modal) modal.style.display = 'flex';
   }
 
   function openEditModal(type, truckId, recordId) {
-    const record = DataModule.findRecord(type, truckId, recordId);
+    const record = DataModule.findRecord(truckId, type, recordId);
     if (!record) {
-      showToast('Record not found.', 'danger');
+      alert("Record not found.");
       return;
     }
 
-    isEditing = true;
-    editingRecordType = type;
+    activeModalType = type;
     editingTruckId = truckId;
     editingRecordId = recordId;
 
     const modal = document.getElementById('addEntryModal');
     const title = document.getElementById('addModalTitle');
-    const truckSelect = document.getElementById('modalTruckSelect');
     const typeSelect = document.getElementById('modalEntryType');
     const submitBtn = document.getElementById('modalSubmitBtn');
 
-    if (truckSelect) {
-      truckSelect.value = truckId;
-      truckSelect.disabled = true; // Lock truck during edit
-    }
+    if (title) title.textContent = '✏️ Edit ' + type.toUpperCase() + ' Record';
+    if (submitBtn) submitBtn.textContent = 'Update Record';
     if (typeSelect) {
       typeSelect.value = type;
-      typeSelect.disabled = true; // Lock type during edit
-      toggleModalFields(type);
+      typeSelect.disabled = true;
     }
 
-    if (title) {
-      if (type === 'trip') title.textContent = '✏️ Edit Freight Shipment Trip';
-      else if (type === 'diesel') title.textContent = '✏️ Edit Diesel Fuel Slip';
-      else if (type === 'advance') title.textContent = '✏️ Edit Driver Advance Payment';
-      else if (type === 'expense') title.textContent = '✏️ Edit En-Route Road Expense';
-      else title.textContent = '✏️ Edit Entry';
-    }
-
-    if (submitBtn) submitBtn.textContent = 'Save Changes';
-
-    // Populate Fields
-    if (type === 'trip') {
-      const datesInput = document.getElementById('tripDates');
-      const fromInput = document.getElementById('tripFrom');
-      const toInput = document.getElementById('tripTo');
-      const pnlInput = document.getElementById('tripPnlFreight');
-      const baseInput = document.getElementById('tripBaseFreight');
-      const transInput = document.getElementById('tripTransporter');
-      const advInput = document.getElementById('tripAdvance');
-
-      if (datesInput) datesInput.value = record.dateRange || '';
-      if (fromInput) fromInput.value = record.from || '';
-      if (toInput) toInput.value = record.to || '';
-      if (pnlInput) pnlInput.value = record.pnlFreight || '';
-      if (baseInput) baseInput.value = record.baseFreight || '';
-      if (transInput) transInput.value = record.transporter || '';
-      if (advInput) advInput.value = record.advanceReceived || '';
-    } else if (type === 'diesel') {
-      const dateInput = document.getElementById('dieselDate');
-      const pumpInput = document.getElementById('dieselPump');
-      const amtInput = document.getElementById('dieselAmount');
-
-      if (dateInput) dateInput.value = record.date || '';
-      if (pumpInput) pumpInput.value = record.pump || '';
-      if (amtInput) amtInput.value = record.amount || '';
-    } else if (type === 'advance') {
-      const dateInput = document.getElementById('advDate');
-      const locInput = document.getElementById('advLocation');
-      const amtInput = document.getElementById('advAmount');
-      const modeInput = document.getElementById('advMode');
-
-      if (dateInput) dateInput.value = record.date || '';
-      if (locInput) locInput.value = record.location || '';
-      if (amtInput) amtInput.value = record.amount || '';
-      if (modeInput) modeInput.value = record.mode || 'Cash';
-    } else if (type === 'expense') {
-      const descInput = document.getElementById('expDesc');
-      const catInput = document.getElementById('expCategory');
-      const amtInput = document.getElementById('expAmount');
-
-      if (descInput) descInput.value = record.description || '';
-      if (catInput) catInput.value = record.category || 'Border / Toll';
-      if (amtInput) amtInput.value = record.amount || '';
-    }
+    populateModalTruckOptions(truckId);
+    toggleModalFields(type);
+    prefillModalFields(type, record);
 
     if (modal) modal.style.display = 'flex';
   }
 
-  function confirmDelete(type, truckId, recordId) {
-    if (!AuthModule.isAdmin()) {
-      showToast('⚠️ Rudra can add and edit records but cannot delete them.', 'danger');
-      return;
-    }
-
-    const typeLabels = {
-      trip: 'freight shipment trip',
-      diesel: 'diesel fuel entry',
-      advance: 'driver advance record',
-      expense: 'road expense receipt'
-    };
-    const label = typeLabels[type] || 'record';
-
-    if (confirm(`Are you sure you want to permanently delete this ${label}?`)) {
-      let success = false;
-      if (type === 'trip') {
-        success = DataModule.deleteTrip(truckId, recordId);
-      } else if (type === 'diesel') {
-        success = DataModule.deleteDiesel(truckId, recordId);
-      } else if (type === 'advance') {
-        success = DataModule.deleteAdvance(truckId, recordId);
-      } else if (type === 'expense') {
-        success = DataModule.deleteExpense(truckId, recordId);
-      }
-
-      if (success) {
-        showToast('🗑️ Record deleted successfully.', 'success');
-        renderCurrentView();
-      } else {
-        showToast('Failed to delete record.', 'danger');
-      }
-    }
+  function populateModalTruckOptions(selectedId) {
+    const truckSelect = document.getElementById('modalTruckSelect');
+    if (!truckSelect) return;
+    const trucks = DataModule.getTrucks();
+    truckSelect.innerHTML = trucks.map(t => `
+      <option value="${t.id}" ${t.id === selectedId ? 'selected' : ''}>
+        ${ApiModule.escapeHtml(t.regNumber || t.id)} (${ApiModule.escapeHtml(t.driverName)})
+      </option>
+    `).join('');
   }
 
-  function clearModalInputs() {
+  function toggleModalFields(type) {
+    ['Trip', 'Diesel', 'Advance', 'Expense'].forEach(t => {
+      const el = document.getElementById('modalFields' + t);
+      if (el) el.style.display = (t.toLowerCase() === type.toLowerCase()) ? 'block' : 'none';
+    });
+  }
+
+  function clearModalFields() {
     ['tripDates', 'tripFrom', 'tripTo', 'tripPnlFreight', 'tripBaseFreight', 'tripTransporter', 'tripAdvance',
      'dieselDate', 'dieselPump', 'dieselAmount',
      'advDate', 'advLocation', 'advAmount',
@@ -331,282 +304,357 @@ const AppModule = (function () {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
+
+    const today = new Date().toISOString().slice(0, 10);
+    if (document.getElementById('dieselDate')) document.getElementById('dieselDate').value = today;
+    if (document.getElementById('advDate')) document.getElementById('advDate').value = today;
   }
 
-  function toggleModalFields(type) {
-    const tripFields = document.getElementById('modalFieldsTrip');
-    const dieselFields = document.getElementById('modalFieldsDiesel');
-    const advanceFields = document.getElementById('modalFieldsAdvance');
-    const expenseFields = document.getElementById('modalFieldsExpense');
-
-    if (tripFields) tripFields.style.display = (type === 'trip') ? 'block' : 'none';
-    if (dieselFields) dieselFields.style.display = (type === 'diesel') ? 'block' : 'none';
-    if (advanceFields) advanceFields.style.display = (type === 'advance') ? 'block' : 'none';
-    if (expenseFields) expenseFields.style.display = (type === 'expense') ? 'block' : 'none';
-  }
-
-  function closeModal() {
-    const modals = document.querySelectorAll('.app-modal-overlay');
-    modals.forEach(m => (m.style.display = 'none'));
-    isEditing = false;
-    editingRecordType = null;
-    editingTruckId = null;
-    editingRecordId = null;
+  function prefillModalFields(type, r) {
+    if (type === 'trip') {
+      if (document.getElementById('tripDates')) document.getElementById('tripDates').value = r.dates || r.date || '';
+      if (document.getElementById('tripFrom')) document.getElementById('tripFrom').value = r.from || '';
+      if (document.getElementById('tripTo')) document.getElementById('tripTo').value = r.to || '';
+      if (document.getElementById('tripPnlFreight')) document.getElementById('tripPnlFreight').value = r.pnlFreight || '';
+      if (document.getElementById('tripBaseFreight')) document.getElementById('tripBaseFreight').value = r.baseFreight || '';
+      if (document.getElementById('tripTransporter')) document.getElementById('tripTransporter').value = r.transporter || 'SR TRSP';
+      if (document.getElementById('tripAdvance')) document.getElementById('tripAdvance').value = r.advanceReceived || '';
+    } else if (type === 'diesel') {
+      if (document.getElementById('dieselDate')) document.getElementById('dieselDate').value = r.date || '';
+      if (document.getElementById('dieselPump')) document.getElementById('dieselPump').value = r.pump || '';
+      if (document.getElementById('dieselAmount')) document.getElementById('dieselAmount').value = r.amount || '';
+    } else if (type === 'advance') {
+      if (document.getElementById('advDate')) document.getElementById('advDate').value = r.date || '';
+      if (document.getElementById('advLocation')) document.getElementById('advLocation').value = r.location || '';
+      if (document.getElementById('advAmount')) document.getElementById('advAmount').value = r.amount || '';
+      if (document.getElementById('advMode')) document.getElementById('advMode').value = r.mode || 'Cash';
+    } else if (type === 'expense') {
+      if (document.getElementById('expDesc')) document.getElementById('expDesc').value = r.desc || '';
+      if (document.getElementById('expCategory')) document.getElementById('expCategory').value = r.category || 'General';
+      if (document.getElementById('expAmount')) document.getElementById('expAmount').value = r.amount || '';
+    }
   }
 
   function saveModalEntry(e) {
     if (e && e.preventDefault) e.preventDefault();
 
-    const type = document.getElementById('modalEntryType').value;
-    const truckId = document.getElementById('modalTruckSelect').value;
+    const truckSelect = document.getElementById('modalTruckSelect');
+    const truckId = truckSelect ? truckSelect.value : editingTruckId;
+    const typeSelect = document.getElementById('modalEntryType');
+    const type = typeSelect ? typeSelect.value : activeModalType;
+
+    const isEdit = (editingRecordId !== null);
 
     if (type === 'trip') {
-      const dates = document.getElementById('tripDates').value.trim();
-      const from = document.getElementById('tripFrom').value.trim();
-      const to = document.getElementById('tripTo').value.trim();
       const pnlFreight = Number(document.getElementById('tripPnlFreight').value) || 0;
       const baseFreight = Number(document.getElementById('tripBaseFreight').value) || pnlFreight;
-      const transporter = document.getElementById('tripTransporter').value.trim() || 'Direct';
-      const adv = Number(document.getElementById('tripAdvance').value) || 0;
+      const advReceived = Number(document.getElementById('tripAdvance').value) || 0;
+      const dates = document.getElementById('tripDates').value;
 
-      if (!dates || !from || !to || !pnlFreight) {
-        alert('Please fill in all mandatory trip details (Dates, From, To, and Freight Amount).');
-        return;
-      }
-
-      const tripPayload = {
-        dateRange: dates,
-        from,
-        to,
-        route: `${from} TO ${to}`,
-        pnlFreight,
-        baseFreight,
-        transporter,
-        advanceReceived: adv,
-        balanceFreight: pnlFreight - adv,
-        podStatus: 'Delivered',
-        remarks: isEditing ? 'Updated via web portal' : 'Added via web portal'
+      const tripData = {
+        dates: dates,
+        date: new Date().toISOString().slice(0, 10),
+        from: document.getElementById('tripFrom').value.trim(),
+        to: document.getElementById('tripTo').value.trim(),
+        pnlFreight: pnlFreight,
+        baseFreight: baseFreight,
+        transporter: document.getElementById('tripTransporter').value.trim() || 'SR TRSP',
+        advanceReceived: advReceived,
+        balanceDue: pnlFreight - advReceived,
+        status: 'Delivered'
       };
 
-      if (isEditing && editingRecordId) {
-        DataModule.updateTrip(truckId, editingRecordId, tripPayload);
-        showToast('✅ Trip details updated successfully!', 'success');
-      } else {
-        DataModule.addTrip(truckId, tripPayload);
-        showToast('✅ Trip added successfully to ledger!', 'success');
-      }
+      if (isEdit) DataModule.updateTrip(truckId, editingRecordId, tripData);
+      else DataModule.addTrip(truckId, tripData);
 
     } else if (type === 'diesel') {
-      const date = document.getElementById('dieselDate').value.trim();
-      const pump = document.getElementById('dieselPump').value.trim();
-      const amount = Number(document.getElementById('dieselAmount').value) || 0;
-
-      if (!amount) {
-        alert('Please specify the fuel amount.');
-        return;
-      }
-
-      const dieselPayload = {
-        date: date || 'Oct 2026',
-        pump: pump || 'Highway Pump',
-        amount
+      const dieselData = {
+        date: document.getElementById('dieselDate').value,
+        pump: document.getElementById('dieselPump').value.trim() || 'Highway Plaza',
+        amount: Number(document.getElementById('dieselAmount').value) || 0
       };
 
-      if (isEditing && editingRecordId) {
-        DataModule.updateDiesel(truckId, editingRecordId, dieselPayload);
-        showToast('⛽ Diesel fuel entry updated!', 'success');
-      } else {
-        DataModule.addDiesel(truckId, dieselPayload);
-        showToast('⛽ Diesel fuel slip recorded!', 'success');
-      }
+      if (isEdit) DataModule.updateDiesel(truckId, editingRecordId, dieselData);
+      else DataModule.addDiesel(truckId, dieselData);
 
     } else if (type === 'advance') {
-      const date = document.getElementById('advDate').value.trim();
-      const location = document.getElementById('advLocation').value.trim();
-      const amount = Number(document.getElementById('advAmount').value) || 0;
-      const mode = document.getElementById('advMode').value;
-
-      if (!amount || !location) {
-        alert('Please provide narration and amount.');
-        return;
-      }
-
-      const advancePayload = {
-        date: date || 'Oct 2026',
-        location,
-        amount,
-        mode
+      const advData = {
+        date: document.getElementById('advDate').value,
+        location: document.getElementById('advLocation').value.trim() || 'Cash Advance',
+        amount: Number(document.getElementById('advAmount').value) || 0,
+        mode: document.getElementById('advMode').value
       };
 
-      if (isEditing && editingRecordId) {
-        DataModule.updateAdvance(truckId, editingRecordId, advancePayload);
-        showToast('💵 Driver advance updated!', 'success');
-      } else {
-        DataModule.addAdvance(truckId, advancePayload);
-        showToast('💵 Driver advance payment recorded!', 'success');
-      }
+      if (isEdit) DataModule.updateAdvance(truckId, editingRecordId, advData);
+      else DataModule.addAdvance(truckId, advData);
 
     } else if (type === 'expense') {
-      const desc = document.getElementById('expDesc').value.trim();
-      const cat = document.getElementById('expCategory').value;
-      const amount = Number(document.getElementById('expAmount').value) || 0;
-
-      if (!amount || !desc) {
-        alert('Please provide description and amount.');
-        return;
-      }
-
-      const expPayload = {
-        description: desc,
-        category: cat,
-        amount
+      const expData = {
+        desc: document.getElementById('expDesc').value.trim(),
+        category: document.getElementById('expCategory').value,
+        amount: Number(document.getElementById('expAmount').value) || 0
       };
 
-      if (isEditing && editingRecordId) {
-        DataModule.updateExpense(truckId, editingRecordId, expPayload);
-        showToast('🚨 Road expense updated!', 'success');
-      } else {
-        DataModule.addExpense(truckId, expPayload);
-        showToast('🚨 Road expense recorded!', 'success');
-      }
+      if (isEdit) DataModule.updateExpense(truckId, editingRecordId, expData);
+      else DataModule.addExpense(truckId, expData);
     }
 
     closeModal();
     renderCurrentView();
+    showToast(isEdit ? 'Record updated successfully!' : 'New record saved successfully!', 'success');
+  }
+
+  // --- Strict RBAC Delete Guard ---
+  function confirmDelete(type, truckId, recordId) {
+    if (!AuthModule.isAdmin()) {
+      alert("Access Denied: Operators (Rudra) cannot delete ledger entries.\nPlease contact Administrator (Shravan Kumar).");
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to permanently delete this ${type.toUpperCase()} record?`)) {
+      return;
+    }
+
+    let ok = false;
+    if (type === 'trip') ok = DataModule.deleteTrip(truckId, recordId);
+    else if (type === 'diesel') ok = DataModule.deleteDiesel(truckId, recordId);
+    else if (type === 'advance') ok = DataModule.deleteAdvance(truckId, recordId);
+    else if (type === 'expense') ok = DataModule.deleteExpense(truckId, recordId);
+
+    if (ok) {
+      renderCurrentView();
+      showToast(`${type.toUpperCase()} record deleted.`, 'info');
+    }
+  }
+
+  function closeModal() {
+    const modals = document.querySelectorAll('.app-modal-overlay');
+    modals.forEach(m => {
+      if (m.id !== 'loginModal') m.style.display = 'none';
+    });
+  }
+
+  // --- Cloud Synchronization & Settings ---
+  function syncNow() {
+    ApiModule.syncNow();
   }
 
   function openSettingsModal() {
+    if (!AuthModule.isAdmin()) {
+      alert("Access Denied: Only Administrator (Admin) can view and configure cloud spreadsheet settings and API links.");
+      return;
+    }
     const modal = document.getElementById('settingsModal');
     const endpointInput = document.getElementById('settingGasEndpoint');
-    if (endpointInput) {
-      endpointInput.value = ApiModule.getEndpoint();
+    const sheetIdInput = document.getElementById('settingSheetUrl');
+    const projectUrlEl = document.getElementById('settingProjectUrlDisplay');
+
+    if (endpointInput) endpointInput.value = ApiModule.getEndpoint();
+    if (sheetIdInput) {
+      const currentId = ApiModule.getProjectSpreadsheetId();
+      sheetIdInput.value = currentId ? `https://docs.google.com/spreadsheets/d/${currentId}/edit?usp=sharing` : '';
+    }
+    if (projectUrlEl && typeof ApiModule.getScriptProjectUrl === 'function') {
+      projectUrlEl.textContent = ApiModule.getScriptProjectUrl();
     }
     if (modal) modal.style.display = 'flex';
   }
 
   function saveSettings(e) {
     if (e && e.preventDefault) e.preventDefault();
-    const endpointInput = document.getElementById('settingGasEndpoint');
-    if (endpointInput) {
-      ApiModule.setEndpoint(endpointInput.value);
+    if (!AuthModule.isAdmin()) {
+      alert("Access Denied: Only Administrator (Admin) can modify system and cloud spreadsheet settings.");
+      return;
     }
+    const endpointInput = document.getElementById('settingGasEndpoint');
+    const sheetIdInput = document.getElementById('settingSheetUrl');
+
+    if (endpointInput) ApiModule.setEndpoint(endpointInput.value);
+    if (sheetIdInput) {
+      let rawVal = sheetIdInput.value.trim();
+      // Extract spreadsheet ID if full URL was pasted
+      const match = rawVal.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      const cleanId = match ? match[1] : rawVal;
+      ApiModule.setProjectSpreadsheetId(cleanId);
+    }
+
     closeModal();
-    showToast('⚙️ System settings updated successfully!', 'success');
+    showToast('⚙️ System settings updated.', 'success');
   }
 
   function restoreOriginalData() {
     if (!AuthModule.isAdmin()) {
-      alert('Only Administrator has permission to restore original Excel data.');
+      alert("Only Administrator can restore master Excel seed data.");
       return;
     }
 
-    if (confirm('Are you sure you want to restore the verified original Excel dataset? Any newly added entries will be re-seeded.')) {
-      DataModule.resetToDefaults();
+    if (confirm("Restore authoritative Excel data? Newly entered records in Project 001 will be reset.")) {
+      DataModule.resetToOriginalSeed();
+      renderTruckFilterPills();
       renderCurrentView();
-      showToast('📋 Original Excel dataset re-seeded successfully!', 'info');
-      closeSidebar();
+      showToast("📋 Master Excel dataset restored successfully!", 'info');
     }
   }
 
-  function syncNow() {
-    ApiModule.syncNow();
+  // --- Dynamic New Truck Modal ---
+  function openAddTruckModal() {
+    if (!AuthModule.isAdmin()) {
+      alert("Only Administrator can register new trucks.");
+      return;
+    }
+    const reg = prompt("Enter new Truck Registration (e.g. TG15T9999):");
+    if (!reg || reg.trim() === '') return;
+    const driver = prompt("Enter Driver Name for " + reg + ":") || "Assigned Driver";
+    const phone = prompt("Enter Driver Phone Number:") || "";
+    const fastTag = prompt("Enter Monthly FastTag Allocated Amount (₹):", "30000") || "0";
+    const addBlue = prompt("Enter Monthly AddBlue / Misc Allocated (₹):", "15000") || "0";
+
+    const newTruck = DataModule.addTruck({
+      regNumber: reg.trim().toUpperCase(),
+      driverName: driver.trim(),
+      driverPhone: phone.trim(),
+      fastTag: Number(fastTag),
+      addBlueAndMisc: Number(addBlue)
+    });
+
+    if (newTruck) {
+      renderTruckFilterPills();
+      selectTruckFilter(newTruck.id);
+      showToast("🚛 New truck " + newTruck.regNumber + " registered successfully!", 'success');
+    }
   }
 
-  // Password Change
+  // --- Dynamic New Project Modal ---
+  function openAddProjectModal() {
+    if (!AuthModule.isAdmin()) {
+      alert("Only Administrator can create new projects.");
+      return;
+    }
+    const name = prompt("Enter New Project Name (e.g. Project 002 - North Corridor):");
+    if (!name || name.trim() === '') return;
+    const desc = prompt("Enter Brief Description:") || "Commercial Transport Project";
+    const sheetId = prompt("Enter Dedicated Google Spreadsheet ID (or leave blank to configure later):") || "";
+
+    const newPrj = DataModule.addProject({
+      name: name.trim(),
+      description: desc.trim(),
+      spreadsheetId: sheetId.trim()
+    });
+
+    if (newPrj) {
+      renderProjectSelector();
+      selectProject(newPrj.id);
+      showToast("📁 Project " + newPrj.name + " created and activated!", 'success');
+    }
+  }
+
+  // --- Password Management ---
   function openChangePasswordModal() {
     const modal = document.getElementById('changePasswordModal');
     const userSpan = document.getElementById('changePwdUserDisplay');
-    const curUser = AuthModule.getCurrentUser();
-    if (userSpan && curUser) {
-      userSpan.textContent = curUser.displayName;
-    }
-    const newPwd = document.getElementById('newPasswordInput');
-    const confirmPwd = document.getElementById('confirmPasswordInput');
-    if (newPwd) newPwd.value = '';
-    if (confirmPwd) confirmPwd.value = '';
+    const user = AuthModule.getCurrentUser();
+    if (userSpan && user) userSpan.textContent = user.displayName || user.username;
     if (modal) modal.style.display = 'flex';
   }
 
   async function savePasswordChange(e) {
     if (e && e.preventDefault) e.preventDefault();
-    const curUser = AuthModule.getCurrentUser();
-    if (!curUser) return;
+    const newPwd = document.getElementById('newPasswordInput').value;
+    const confirmPwd = document.getElementById('confirmPasswordInput').value;
 
-    const newPwd = (document.getElementById('newPasswordInput') || {}).value;
-    const confirmPwd = (document.getElementById('confirmPasswordInput') || {}).value;
-
-    if (!newPwd || newPwd.length < 4) {
-      alert('Password must be at least 4 characters long.');
-      return;
-    }
     if (newPwd !== confirmPwd) {
-      alert('Passwords do not match. Please re-enter.');
+      alert("Passwords do not match!");
       return;
     }
 
-    const success = await AuthModule.updatePassword(curUser.username, newPwd);
-    if (success) {
+    const user = AuthModule.getCurrentUser();
+    if (!user) return;
+
+    const res = await AuthModule.updatePassword(user.username, newPwd);
+    if (res.success) {
       closeModal();
-      showToast('🔑 Password changed successfully!', 'success');
+      showToast("🔑 Password updated successfully!", 'success');
     } else {
-      alert('Failed to update password.');
+      alert(res.message);
     }
   }
 
-  function showToast(message, type = 'info') {
+  // --- Sidebar Toggle ---
+  function toggleSidebar(e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const drawer = document.getElementById('appDrawer');
+    const backdrop = document.getElementById('drawerBackdrop');
+    if (drawer) drawer.classList.toggle('open');
+    if (backdrop) backdrop.classList.toggle('open');
+  }
+
+  function closeSidebar() {
+    const drawer = document.getElementById('appDrawer');
+    const backdrop = document.getElementById('drawerBackdrop');
+    if (drawer) drawer.classList.remove('open');
+    if (backdrop) backdrop.classList.remove('open');
+  }
+
+  // --- Toast Notification Utility ---
+  function showToast(message, type) {
     const container = document.getElementById('toastContainer');
     if (!container) return;
 
     const toast = document.createElement('div');
-    toast.className = `toast-item toast-${type}`;
-    toast.innerHTML = `
-      <span class="toast-icon">${type === 'success' ? '✓' : type === 'danger' ? '⚠️' : 'ℹ️'}</span>
-      <span class="toast-msg">${message}</span>
-    `;
-
+    toast.className = 'toast-pill toast-' + (type || 'info');
+    toast.innerHTML = `<span>${ApiModule.escapeHtml(message)}</span>`;
     container.appendChild(toast);
-    setTimeout(() => {
-      toast.classList.add('visible');
-    }, 50);
 
     setTimeout(() => {
-      toast.classList.remove('visible');
-      setTimeout(() => toast.remove(), 300);
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 400);
     }, 3500);
+  }
+
+  function setupEventListeners() {
+    // Keyboard Escape to close modals
+    window.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeModal();
+    });
   }
 
   return {
     init,
     switchView,
+    selectProject,
     selectTruckFilter,
-    selectMonthFilter,
-    getCurrentTruckFilter,
-    toggleSidebar,
-    openSidebar,
-    closeSidebar,
+    selectPeriodFilter,
+    applyCustomDateFilter,
+    resetFilters,
+    applySearch,
     openAddModal,
     openEditModal,
-    confirmDelete,
-    toggleModalFields,
-    closeModal,
     saveModalEntry,
+    confirmDelete,
+    openAddTruckModal,
+    openAddProjectModal,
     openSettingsModal,
     saveSettings,
     restoreOriginalData,
     openChangePasswordModal,
     savePasswordChange,
     syncNow,
+    toggleSidebar,
+    closeSidebar,
+    closeModal,
     showToast,
-    onUserAuthenticated,
-    renderCurrentView
+    toggleModalFields
   };
 })();
 
-// Initialize on DOM ready
-document.addEventListener('DOMContentLoaded', () => {
-  AppModule.init();
-});
-
+// Initialize on DOM load
 if (typeof window !== 'undefined') {
   window.AppModule = AppModule;
+  window.addEventListener('DOMContentLoaded', () => {
+    AppModule.init();
+  });
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = AppModule;
 }
