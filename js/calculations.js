@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Transport Brokerage Ledger Pvt Ltd
  * Mathematical Calculation Engine (calculations.js)
  */
