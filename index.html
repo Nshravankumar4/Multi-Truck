@@ -1,627 +1,526 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Transport Brokerage Ledger — Fleet Logistics &amp; Financial Accounts Management</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111827">
+  <meta name="description" content="SR Transport - Multi-Truck Fleet Logistics & Brokerage Financial Ledger">
+  <title>SR Transport - Fleet Management &amp; Financial Ledger</title>
+  
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
-  <script src="https://unpkg.com/lucide@latest"></script>
+
   <script src="libs/exceljs.min.js"></script>
   <script src="libs/FileSaver.min.js"></script>
   <script src="libs/xlsx.full.min.js"></script>
+
+  <script defer src="js/data.js"></script>
+  <script defer src="js/calculations.js"></script>
+  <script defer src="js/auth.js"></script>
+  <script defer src="js/api.js"></script>
+  <script defer src="js/dashboard.js"></script>
+  <script defer src="js/table.js"></script>
+  <script defer src="js/app.js"></script>
 </head>
 <body>
-  <noscript>
-    <div style="background: #fee2e2; color: #b91c1c; padding: 1.25rem; font-family: 'Inter', sans-serif; font-weight: 600; text-align: center; border-bottom: 2px solid #ef4444;">
-      ⚠️ JavaScript is disabled. Transport Brokerage Ledger requires JavaScript to be enabled in order to authenticate and manage fleet financial accounts.
-    </div>
-  </noscript>
+  <noscript><p class="noscript">SR Transport Ledger requires JavaScript to run.</p></noscript>
 
-  <!-- 1. FULL-SCREEN PERSONALIZED WELCOME & FETCH SPLASH -->
-  <div id="welcomeSplashOverlay" class="welcome-splash-overlay" style="display: none;">
-    <div class="welcome-splash-card">
-      <div class="welcome-splash-icon">🚛</div>
-      <h2 id="welcomeSplashGreeting" class="welcome-splash-title">👋 Welcome, Shravan (Admin)!</h2>
-      <p class="welcome-splash-sub">Transport Brokerage Ledger Pvt Ltd</p>
-      <div class="welcome-spinner-ring"></div>
-      <div id="welcomeSplashStatus" class="welcome-splash-status">Authenticating credentials &amp; loading verified financial records...</div>
-    </div>
-  </div>
-
-  <!-- 2. LOGIN / AUTHENTICATION SCREEN -->
-  <div id="authWrapper" class="auth-wrapper" style="display: none;">
+  <!-- 1. AUTHENTICATION VIEW -->
+  <section id="auth-view" class="auth-wrapper">
     <div class="auth-card">
-      <div class="auth-header">
-        <h1>🚛 Transport Brokerage Ledger</h1>
-        <p style="font-size: 0.8rem; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #1e3a8a; margin: 0.2rem 0 0.5rem;">
-          Fleet Logistics &amp; Financial Accounts Management
-        </p>
-        <p>Sign in with your secure account</p>
-      </div>
+      <header class="auth-header">
+        <div class="auth-brand-icon" aria-hidden="true">🚛</div>
+        <p class="auth-eyebrow">FLEET LOGISTICS &amp; ACCOUNTS</p>
+        <h1>SR Transport Ledger</h1>
+        <p>Sign in to manage multi-truck logistics &amp; financials.</p>
+      </header>
 
-      <div id="loginErrorMsg" style="display: none; color: #b91c1c; background: #fee2e2; border: 1px solid #fca5a5; padding: 0.6rem; border-radius: 6px; font-size: 0.85rem; margin-bottom: 1rem; text-align: center;"></div>
+      <div id="auth-message" class="notice notice-info" role="status" aria-live="polite" hidden></div>
+      <div id="loginErrorMsg" class="notice notice-error" role="alert" style="display: none;"></div>
 
-      <form id="authLoginForm">
-        <!-- Left / Right User Selector -->
+      <form id="authLoginForm" novalidate>
         <div class="user-switch-container">
-          <label class="user-switch-label">Select User Account</label>
+          <label class="user-switch-label">SELECT USER ACCOUNT</label>
           <div class="user-switch-group">
-            <button type="button" id="userBtnAdmin" class="user-switch-card active" onclick="AuthModule.selectLoginUser('Admin')">
+            <button type="button" id="userBtnAdmin" class="user-switch-card active" aria-label="Select Admin Account">
               <div class="user-switch-badge">👑</div>
               <div class="user-switch-info">
                 <span class="user-switch-name">ADMIN</span>
                 <span class="user-switch-role">Administrator</span>
               </div>
             </button>
-            <button type="button" id="userBtnRudra" class="user-switch-card" onclick="AuthModule.selectLoginUser('Rudra')">
+            <button type="button" id="userBtnRudra" class="user-switch-card" aria-label="Select Rudra Account">
               <div class="user-switch-badge">👤</div>
               <div class="user-switch-info">
                 <span class="user-switch-name">RUDRA</span>
-                <span class="user-switch-role">User / Operator</span>
+                <span class="user-switch-role">Operator</span>
               </div>
             </button>
           </div>
           <input type="hidden" id="loginSelectedUser" value="Admin">
+          <input type="hidden" id="login-username" value="Admin">
         </div>
 
-        <div class="form-group" style="margin-bottom: 1.25rem;">
-          <label for="loginPassword" style="font-weight: 600; margin-bottom: 0.4rem; display: block; font-size: 0.88rem; color: #334155;">🔑 Password</label>
-          <div style="position: relative;">
-            <input type="password" id="loginPassword" class="form-control" placeholder="Enter password for Admin" required autocomplete="current-password" autofocus style="padding-right: 2.5rem; font-size: 1rem; width: 100%;">
-            <button type="button" id="togglePasswordBtn" onclick="AuthModule.togglePasswordVisibility()" style="position: absolute; right: 0.6rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1.1rem; padding: 0; line-height: 1;" title="Show/Hide Password">👁️</button>
+        <div class="form-group">
+          <label for="loginPassword">🔑 Password</label>
+          <div class="auth-password-control">
+            <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter password for Admin" required>
+            <input id="login-password" type="hidden">
+            <button id="togglePasswordBtn" class="auth-toggle-pwd" type="button" aria-label="Toggle password visibility" title="Show/Hide Password">👁️</button>
           </div>
         </div>
 
-        <button type="submit" id="loginSubmitBtn" class="btn btn-primary" style="width: 100%; padding: 0.75rem; font-weight: 700; font-size: 1rem; border-radius: 8px; justify-content: center;">
-          🚀 Secure Login
-        </button>
+        <button id="loginSubmitBtn" class="btn btn-primary" type="submit" style="width: 100%; padding: 0.75rem; font-size: 0.95rem;">🚀 Secure Login</button>
       </form>
 
-      <div style="margin-top: 1.25rem; padding-top: 0.85rem; border-top: 1px solid rgba(0,0,0,0.08); text-align: center; font-size: 0.74rem; color: #64748b; line-height: 1.6;">
-        Developed by <strong style="color: #1e40af; font-size: 0.8rem;">Shravan Kumar</strong><br>
-        Fleet Logistics &amp; Financial Accounts Management • 2026
+      <div class="auth-developer-credit">
+        Developed by <strong>Shravan Kumar</strong><br>
+        Multi-Truck Transport &amp; Financial Ledger
       </div>
     </div>
 
-    <!-- Login Page Footer Bar -->
-    <div class="auth-footer-bar">
-      <span><strong>Brokerage Ledger • Enterprise Freight &amp; Fleet Management</strong></span>
-      <span>© 2026 Transport Brokerage Ledger Pvt Ltd • Developed by <strong>Shravan Kumar</strong> • All Rights Reserved</span>
-    </div>
-  </div>
+    <footer class="auth-footer">
+      <span>🚛 <strong>SR TRANSPORT</strong> · Fleet Management &amp; Financial Ledger</span>
+      <span>© 2026 Transport Brokerage Ledger Pvt Ltd · Developed by <strong>Shravan Kumar</strong> · All Rights Reserved</span>
+    </footer>
+  </section>
 
-  <!-- 3. SLIDE-IN APP SIDEBAR / SETTINGS DRAWER (Screenshot 4 Style) -->
-  <aside id="appDrawer" class="app-sidebar-drawer">
-    <div class="drawer-header">
-      <div class="drawer-brand">
-        <div class="brand-icon">🚚</div>
-        <div class="brand-text">
-          <h3>Transport Brokerage Ledger</h3>
-          <span>FLEET LOGISTICS &amp; FINANCIAL ACCOUNTS MANAGEMENT</span>
+  <!-- 2. MAIN APPLICATION SHELL -->
+  <div id="app-shell" class="app-layout" hidden>
+    <!-- Left Navigation Sidebar -->
+    <aside id="sidebar" class="app-sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <div class="brand-icon" aria-hidden="true">🚛</div>
+          <div>
+            <h2>SR Transport</h2>
+            <span>Fleet &amp; Accounts</span>
+          </div>
         </div>
-      </div>
-      <button class="drawer-close-btn" onclick="AppModule.closeSidebar()" aria-label="Close menu">✕</button>
-    </div>
-
-    <!-- User Profile Badge -->
-    <div class="drawer-user-card">
-      <div class="user-avatar">👤</div>
-      <div class="user-details">
-        <div id="drawerUserName" class="user-name">Shravan (Admin)</div>
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 4px;">
-          <div class="user-role-badge"><span id="drawerUserRole">ADMIN</span></div>
-          <button class="btn-change-pwd" onclick="AppModule.openChangePasswordModal(); AppModule.closeSidebar();" title="Change your password">🔑 Change</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Navigation Section (Zero Scrollbar) -->
-    <nav class="drawer-menu">
-      <div class="drawer-menu-label">WORKSPACE</div>
-      <button class="drawer-nav-item active" id="drawerNavDashboard" data-view-target="dashboard" onclick="AppModule.switchView('dashboard'); AppModule.closeSidebar();">
-        <span class="drawer-item-icon">📊</span>
-        <span>Overview</span>
-      </button>
-      <button class="drawer-nav-item" id="drawerNavFleet" data-view-target="fleet" onclick="AppModule.switchView('fleet'); AppModule.closeSidebar();">
-        <span class="drawer-item-icon">🚛</span>
-        <span>Fleet Vehicles</span>
-      </button>
-      <button class="drawer-nav-item" id="drawerNavTrips" data-view-target="trips" onclick="AppModule.switchView('trips'); AppModule.closeSidebar();">
-        <span class="drawer-item-icon">📦</span>
-        <span>Shipment Trips</span>
-      </button>
-      <button class="drawer-nav-item" id="drawerNavPnl" data-view-target="pnl" onclick="AppModule.switchView('pnl'); AppModule.closeSidebar();">
-        <span class="drawer-item-icon">💼</span>
-        <span>Financials (P&amp;L)</span>
-      </button>
-      <button class="drawer-nav-item" id="drawerNavExpenses" data-view-target="expenses" onclick="AppModule.switchView('expenses'); AppModule.closeSidebar();">
-        <span class="drawer-item-icon">⛽</span>
-        <span>Expenses &amp; Fuel</span>
-      </button>
-      <button class="drawer-nav-item" id="drawerNavDriver" data-view-target="driver" onclick="AppModule.switchView('driver'); AppModule.closeSidebar();">
-        <span class="drawer-item-icon">🤝</span>
-        <span>Driver Settlements</span>
-      </button>
-      <button class="drawer-nav-item" id="drawerNavReports" data-view-target="reports" onclick="AppModule.switchView('reports'); AppModule.closeSidebar();">
-        <span class="drawer-item-icon">📈</span>
-        <span>Reports &amp; Analytics</span>
-      </button>
-      <button class="drawer-nav-item" id="drawerNavExcel" data-view-target="excel" onclick="AppModule.switchView('excel'); AppModule.closeSidebar();">
-        <span class="drawer-item-icon">📑</span>
-        <span>Spreadsheet Replica</span>
-      </button>
-
-      <div class="drawer-menu-label" style="margin-top: 1rem;">TOOLS &amp; ACTIONS</div>
-      <button class="drawer-nav-item" onclick="AppModule.syncNow(); AppModule.closeSidebar();">
-        <span class="drawer-item-icon">🔄</span>
-        <span>Sync Cloud Database</span>
-      </button>
-      <button class="drawer-nav-item admin-only" onclick="ApiModule.openGoogleSheet(); AppModule.closeSidebar();">
-        <span class="drawer-item-icon">📊</span>
-        <span>Open Dedicated Google Sheet</span>
-      </button>
-      <button class="drawer-nav-item" onclick="TableModule.exportToExcel(); AppModule.closeSidebar();">
-        <span class="drawer-item-icon">📥</span>
-        <span>Export Excel (.xlsx)</span>
-      </button>
-      <button class="drawer-nav-item admin-only" onclick="AppModule.openSettingsModal(); AppModule.closeSidebar();">
-        <span class="drawer-item-icon">⚙️</span>
-        <span>Settings &amp; API (Admin)</span>
-      </button>
-      <button class="drawer-nav-item admin-only" onclick="AppModule.restoreOriginalData();">
-        <span class="drawer-item-icon">📋</span>
-        <span>Restore Excel Data</span>
-      </button>
-    </nav>
-
-    <!-- Drawer Footer (Screenshot 4: Status + Blue Sync + Red Logout Button) -->
-    <div class="drawer-footer">
-      <div class="drawer-status-bar">
-        <div class="drawer-system-status">
-          <span class="status-dot"></span>
-          <span id="drawerStatusText">Online • 2 Trucks • 7 Verified Trips</span>
-        </div>
-        <button class="drawer-sync-btn" onclick="AppModule.syncNow()" title="Trigger cloud sync">
-          <span>🔄</span> Sync
-        </button>
-      </div>
-      <button class="sidebar-logout-btn" onclick="AuthModule.logout(); AppModule.closeSidebar();">
-        <span>🚪</span> Logout / Switch User
-      </button>
-      <div class="drawer-footer-text">
-        Brokerage Ledger • Enterprise Freight &amp; Fleet Management<br>
-        © 2026 Transport Brokerage Ledger Pvt Ltd • Developed by Shravan Kumar
-      </div>
-    </div>
-  </aside>
-
-  <!-- Dimmed Backdrop for Slide-In Drawer -->
-  <div id="drawerBackdrop" class="drawer-backdrop" onclick="AppModule.closeSidebar()"></div>
-
-  <!-- 4. MAIN APPLICATION LAYOUT -->
-  <div id="appWrapper" class="app-wrapper">
-    <!-- Top Navigation Bar -->
-    <header class="app-navbar">
-      <div class="brand-section">
-        <button id="btnOpenSidebar" class="btn-menu-drawer" onclick="AppModule.toggleSidebar(event)" title="Open Navigation Drawer">
-          ☰ Menu
-        </button>
-        <div class="brand-icon">🚛</div>
-        <div class="brand-text">
-          <h1>Transport Brokerage Ledger</h1>
-          <span>Fleet Logistics &amp; Financial Accounts Management</span>
-        </div>
-        <!-- Live Location Breadcrumb -->
-        <div class="breadcrumb-container" style="margin-left: 0.85rem; padding-left: 0.85rem; border-left: 1px solid #cbd5e1; display: flex; align-items: center; gap: 0.35rem;">
-          <span style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Workspace /</span>
-          <span id="headerBreadcrumbView" style="font-size: 0.82rem; font-weight: 700; color: #1e3a8a;">Overview • Fleet Command Center</span>
-        </div>
-        <!-- Project Switcher & Creator -->
-        <div class="project-selector-wrapper" style="margin-left: 1rem; display: flex; align-items: center; gap: 0.4rem;">
-          <select id="projectSelectDropdown" class="form-control" onchange="AppModule.selectProject(this.value)" style="font-size: 0.82rem; font-weight: 600; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.35rem 0.6rem; cursor: pointer;"></select>
-          <button class="btn btn-xs btn-outline admin-only" onclick="AppModule.openAddProjectModal()" title="Create New Isolated Project" style="white-space: nowrap; font-size: 0.76rem; padding: 0.3rem 0.5rem;">
-            ＋ Project
-          </button>
-        </div>
+        <button id="sidebar-close" class="sidebar-close-btn" type="button" aria-label="Close navigation">×</button>
       </div>
 
-      <!-- Navigation Tabs (Center - Enterprise Suite) -->
-      <nav class="nav-tabs-group">
-        <button id="btnNavDashboard" data-view-target="dashboard" class="nav-tab-btn active" onclick="AppModule.switchView('dashboard')">
-          📊 Overview
+      <section class="sidebar-user-card" aria-label="Signed-in user">
+        <div class="user-avatar" aria-hidden="true">👤</div>
+        <div class="user-details">
+          <strong id="userDisplayName">Shravan Kumar</strong>
+          <span id="userRoleBadge" class="user-role-badge">ADMIN</span>
+        </div>
+      </section>
+
+      <div class="sidebar-status-row">
+        <div class="status-indicator">
+          <span id="cloudStatusDot" class="status-dot online"></span>
+          <span id="cloudStatusText">Synced</span>
+        </div>
+        <button id="sidebarSyncBtn" class="sidebar-sync-button" type="button" title="Sync database now">↻ Sync</button>
+      </div>
+
+      <!-- 6 Main Navigation Items -->
+      <nav class="sidebar-menu" aria-label="Main navigation">
+        <button class="nav-tab active" type="button" data-view="dashboard">
+          <span class="nav-icon" aria-hidden="true">📊</span> Dashboard
         </button>
-        <button id="btnNavFleet" data-view-target="fleet" class="nav-tab-btn" onclick="AppModule.switchView('fleet')">
-          🚛 Fleet
+        <button class="nav-tab" type="button" data-view="vehicles">
+          <span class="nav-icon" aria-hidden="true">🚛</span> Vehicles
         </button>
-        <button id="btnNavTrips" data-view-target="trips" class="nav-tab-btn" onclick="AppModule.switchView('trips')">
-          📦 Trips
+        <button class="nav-tab" type="button" data-view="trips">
+          <span class="nav-icon" aria-hidden="true">🛣️</span> Trips
         </button>
-        <button id="btnNavPnl" data-view-target="pnl" class="nav-tab-btn" onclick="AppModule.switchView('pnl')">
-          💼 Financials
+        <button class="nav-tab" type="button" data-view="financials">
+          <span class="nav-icon" aria-hidden="true">💰</span> Financials
         </button>
-        <button id="btnNavExpenses" data-view-target="expenses" class="nav-tab-btn" onclick="AppModule.switchView('expenses')">
-          ⛽ Expenses
+        <button class="nav-tab" type="button" data-view="settlements">
+          <span class="nav-icon" aria-hidden="true">📋</span> Driver Settlements
         </button>
-        <button id="btnNavDriver" data-view-target="driver" class="nav-tab-btn" onclick="AppModule.switchView('driver')">
-          🤝 Settlements
-        </button>
-        <button id="btnNavReports" data-view-target="reports" class="nav-tab-btn" onclick="AppModule.switchView('reports')">
-          📈 Reports
-        </button>
-        <button id="btnNavExcel" data-view-target="excel" class="nav-tab-btn" onclick="AppModule.switchView('excel')">
-          📑 Replica
+        <button class="nav-tab" type="button" data-view="settings">
+          <span class="nav-icon" aria-hidden="true">⚙️</span> Settings
         </button>
       </nav>
 
-      <!-- User Profile & RBAC (Right) -->
-      <div class="nav-user-panel">
-        <button id="headerCloudSyncBadge" class="header-sync-pill" onclick="AppModule.syncNow()" title="Click to trigger cloud synchronization">
-          🟢 Cloud Ready
+      <div class="sidebar-footer">
+        <button id="logout-button" class="sidebar-logout-btn" type="button">
+          <span aria-hidden="true">↪</span> Log out / Switch User
         </button>
-        <div class="user-info-text">
-          <span>👤</span>
-          <span id="currentUserDisplay">Shravan (Admin)</span>
-          <span id="currentUserRoleBadge" class="user-role-badge role-admin">ADMIN</span>
-        </div>
-        <button class="btn-nav-logout" onclick="AuthModule.logout()">🚪 Logout</button>
       </div>
-    </header>
+    </aside>
 
-    <!-- Sub-Header Filter & Action Toolbar -->
-    <div class="app-sub-toolbar" style="display: flex; flex-direction: column; gap: 0.75rem; padding: 0.75rem 1.25rem;">
-      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 0.75rem;">
-        <!-- Dynamic Truck Selector Filter Pills -->
-        <div class="truck-filter-group" id="truckFilterPillsContainer" style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
-          <!-- Dynamically populated by AppModule.renderTruckFilterPills() -->
-        </div>
+    <button id="sidebar-scrim" class="sidebar-scrim" type="button" aria-label="Close navigation"></button>
 
-        <!-- Right Action Buttons -->
-        <div class="toolbar-right-actions" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-          <button class="btn btn-primary" onclick="AppModule.openAddModal('trip')">
-            <span style="font-size: 1.1rem; line-height: 1;">＋</span> Add Shipment
-          </button>
-          <button class="btn btn-secondary" onclick="TableModule.exportToExcel()" title="Download genuine Excel .xlsx with preserved formulas">
-            📥 Export Excel (.xlsx)
-          </button>
-          <button class="btn btn-secondary admin-only" onclick="ApiModule.openGoogleSheet()" title="Open Dedicated Google Sheet (Admin Only)">
-            📊 Open Sheet
-          </button>
-          <button class="btn btn-secondary sync-trigger-btn" onclick="AppModule.syncNow()" title="Sync Cloud Ledger">
-            🔄 Sync
-          </button>
-          <button class="btn btn-secondary admin-only" onclick="AppModule.openSettingsModal()" title="Cloud Ledger &amp; Sheet Settings (Admin Only)">
-            ⚙️
-          </button>
-        </div>
-      </div>
-
-      <!-- Date Range, Accounting Period & Live Search Filter Row -->
-      <div class="filter-controls-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.5rem 0.75rem;">
-        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-          <span style="font-size: 0.8rem; font-weight: 600; color: #475569;">📅 Period:</span>
-          <select id="filterPeriodSelect" class="form-control" style="font-size: 0.82rem; padding: 0.25rem 0.5rem; border-radius: 4px; width: auto;">
-            <!-- Dynamically populated from DataModule.getAccountingPeriods() -->
-          </select>
-
-          <span style="font-size: 0.8rem; font-weight: 600; color: #475569; margin-left: 0.5rem;">From:</span>
-          <input type="date" id="filterStartDate" class="form-control" style="font-size: 0.82rem; padding: 0.2rem 0.4rem; width: 135px;">
-          <span style="font-size: 0.8rem; font-weight: 600; color: #475569;">To:</span>
-          <input type="date" id="filterEndDate" class="form-control" style="font-size: 0.82rem; padding: 0.2rem 0.4rem; width: 135px;">
-          <button class="btn btn-sm btn-secondary" onclick="AppModule.applyCustomDateFilter()">Filter Date</button>
-          <button class="btn btn-sm btn-outline" onclick="AppModule.resetFilters()">Reset</button>
-        </div>
-
-        <!-- Live Search Input -->
-        <div style="display: flex; align-items: center; gap: 0.4rem;">
-          <span style="font-size: 0.8rem; color: #64748b;">🔍</span>
-          <input type="text" id="filterSearchInput" class="form-control" placeholder="Search route, pump, driver..." oninput="AppModule.applySearch(this.value)" style="font-size: 0.82rem; width: 220px; padding: 0.25rem 0.5rem;">
-        </div>
-      </div>
-    </div>
-
-    <!-- Main Viewport Content -->
+    <!-- Main Viewport Area -->
     <main class="app-main-viewport">
-      <!-- View 1: Executive Dashboard / Overview -->
-      <section id="view-dashboard"></section>
+      <header class="mobile-top-bar">
+        <button id="sidebar-open" class="mobile-menu-btn" type="button" aria-label="Open navigation">☰</button>
+        <strong>SR Transport Ledger</strong>
+      </header>
 
-      <!-- View 2: Dedicated Fleet Vehicle Management -->
-      <section id="view-fleet" style="display: none;"></section>
+      <div class="app-content">
+        <!-- Top Title & Quick Actions -->
+        <div class="page-top-bar">
+          <div class="page-title-wrap">
+            <h1 id="page-title">Dashboard</h1>
+            <p id="page-subtitle">Multi-truck financial performance &amp; trip accounts</p>
+          </div>
+          <div class="toolbar-actions">
+            <button id="topAddEntryBtn" class="btn btn-primary" type="button">＋ Add Record</button>
+            <button id="topExportExcelBtn" class="btn btn-secondary" type="button">📊 Export Excel</button>
+          </div>
+        </div>
 
-      <!-- View 3: Dedicated Shipment Trips Ledger -->
-      <section id="view-trips" style="display: none;"></section>
+        <!-- Clean Filter & Period Toolbar -->
+        <div class="toolbar-strip">
+          <div class="toolbar-filters">
+            <!-- Project Selector Dropdown -->
+            <div class="filter-item">
+              <label for="projectSelectDropdown">Project:</label>
+              <select id="projectSelectDropdown" class="filter-select">
+                <option value="PRJ-001">Project 001 - Hyderabad South</option>
+              </select>
+            </div>
 
-      <!-- View 4: P&L Detailed Accounts -->
-      <section id="view-pnl" style="display: none;"></section>
+            <!-- Accounting Period Selector -->
+            <div class="filter-item">
+              <label for="filterPeriodSelect">Period:</label>
+              <select id="filterPeriodSelect" class="filter-select">
+                <option value="2026-10">October 2026</option>
+                <option value="2026-09">September 2026</option>
+                <option value="2026-11">November 2026</option>
+                <option value="ALL">All Periods</option>
+              </select>
+            </div>
 
-      <!-- View 5: Dedicated Operating Expenses & Fuel -->
-      <section id="view-expenses" style="display: none;"></section>
+            <!-- Date Range Controls -->
+            <div class="filter-item">
+              <label for="filterStartDate">From:</label>
+              <input type="date" id="filterStartDate" class="filter-select">
+            </div>
+            <div class="filter-item">
+              <label for="filterEndDate">To:</label>
+              <input type="date" id="filterEndDate" class="filter-select">
+            </div>
 
-      <!-- View 6: Driver Settlements & Advances -->
-      <section id="view-driver" style="display: none;"></section>
+            <!-- Dynamic Truck Filter Pills Container -->
+            <div class="filter-item">
+              <label>Vehicle:</label>
+              <div id="truckFilterPillsContainer" class="truck-pills-row">
+                <button type="button" class="truck-pill active" data-truck="ALL">All Fleet</button>
+                <button type="button" class="truck-pill" data-truck="TG15T6666">TG15T6666</button>
+                <button type="button" class="truck-pill" data-truck="TS15UE1122">TS15UE1122</button>
+              </div>
+            </div>
+          </div>
 
-      <!-- View 7: Financial Reports & Analytics -->
-      <section id="view-reports" style="display: none;"></section>
+          <div class="toolbar-actions">
+            <button id="btnHeaderSync" class="btn btn-secondary btn-sm" type="button">↻ Sync Cloud</button>
+          </div>
+        </div>
 
-      <!-- View 8: Excel 1:1 Live Replica -->
-      <section id="view-excel" style="display: none;"></section>
+        <!-- Toast Notifications -->
+        <div id="toast" class="toast-container" role="status" aria-live="polite"></div>
+        <div id="toastContainer" class="toast-container"></div>
+
+        <!-- 6 Main View Containers (with backward-compatible IDs for test suite) -->
+        <section id="view-dashboard" class="app-view"></section>
+        <section id="view-fleet" class="app-view" hidden></section>
+        <section id="view-trips" class="app-view" hidden></section>
+        <section id="view-pnl" class="app-view" hidden></section>
+        <section id="view-expenses" class="app-view" hidden></section>
+        <section id="view-driver" class="app-view" hidden></section>
+        <section id="view-reports" class="app-view" hidden></section>
+        <section id="view-excel" class="app-view" hidden></section>
+        <section id="view-settings" class="app-view" hidden></section>
+      </div>
+
+      <!-- Footer Bar -->
+      <footer class="app-footer">
+        <span>🚛 <strong>SR TRANSPORT</strong> · Multi-Truck Fleet &amp; Financial Ledger</span>
+        <span>© 2026 Transport Brokerage Ledger Pvt Ltd · Developed by <strong>Shravan Kumar</strong> · All Rights Reserved</span>
+        <span id="footerSyncStatus">Google Sheets Connected</span>
+      </footer>
     </main>
-
-    <!-- System Global Footer -->
-    <footer style="background: #ffffff; border-top: 1px solid #e2e8f0; padding: 1.25rem; text-align: center; color: #64748b; font-size: 0.78rem; line-height: 1.6;">
-      <strong>Transport Brokerage Ledger Pvt Ltd</strong> • Fleet Logistics &amp; Financial Accounts Management<br>
-      © 2026 All Rights Reserved • Master Architecture Developed by <strong style="color: #1e40af;">Shravan Kumar</strong>
-    </footer>
   </div>
 
-  <!-- 5. ADD / EDIT RECORD MODAL -->
-  <div id="addEntryModal" class="app-modal-overlay" style="display: none;">
-    <div class="app-modal-card">
+  <!-- 3. REUSABLE ADD / EDIT RECORD DIALOG -->
+  <dialog id="entryModal" class="modal-dialog">
+    <div class="modal-form-wrap">
       <div class="modal-header">
-        <h3 id="addModalTitle">➕ Add Financial Entry</h3>
-        <button class="modal-close-btn" onclick="AppModule.closeModal()">✕</button>
+        <h2 id="modalTitle">＋ Add Record</h2>
+        <button id="closeEntryModalBtn" class="modal-close-btn" type="button">✕</button>
       </div>
-      <form id="addEntryForm">
+
+      <form id="addEntryForm" novalidate>
         <div class="modal-body">
-          <div class="form-row">
+          <div class="form-grid-2">
             <div class="form-group">
-              <label for="modalEntryType">Entry Type</label>
-              <select id="modalEntryType" class="form-control">
-                <option value="trip">Freight Shipment Trip ($P_1$)</option>
-                <option value="diesel">Diesel Fuel Entry ($P_2$)</option>
-                <option value="advance">Driver Advance Payment</option>
-                <option value="expense">En-Route Road Expense</option>
+              <label for="modalEntryType">Record Type <span style="color:red;">*</span></label>
+              <select id="modalEntryType" class="form-control" required>
+                <option value="trip">Trip Record (Freight)</option>
+                <option value="diesel">Diesel Fuel Entry</option>
+                <option value="advance">Driver Advance</option>
+                <option value="expense">Road Expense Voucher</option>
               </select>
             </div>
             <div class="form-group">
-              <label for="modalTruckSelect">Vehicle Number</label>
-              <select id="modalTruckSelect" class="form-control">
-                <!-- Dynamically populated from DataModule.getTrucks() -->
-              </select>
+              <label for="modalTruckSelect">Vehicle <span style="color:red;">*</span></label>
+              <select id="modalTruckSelect" class="form-control" required></select>
             </div>
           </div>
 
-          <!-- Fields: Trip -->
+          <!-- Trip Fields -->
           <div id="modalFieldsTrip">
-            <div class="form-group">
-              <label for="tripDates">Trip Date Range</label>
-              <input type="text" id="tripDates" class="form-control" placeholder="e.g. 21-10-26 TO 24-10-26">
-            </div>
-            <div class="form-row">
+            <div class="form-grid-2">
               <div class="form-group">
-                <label for="tripFrom">From (Origin)</label>
-                <input type="text" id="tripFrom" class="form-control" placeholder="e.g. MDCL">
+                <label for="tripDate">Trip Date <span style="color:red;">*</span></label>
+                <input type="date" id="tripDate" class="form-control">
               </div>
-              <div class="form-group">
-                <label for="tripTo">To (Destination)</label>
-                <input type="text" id="tripTo" class="form-control" placeholder="e.g. PATNA">
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="tripPnlFreight">P&amp;L Freight Amount ($P_1$)</label>
-                <input type="number" id="tripPnlFreight" class="form-control" placeholder="₹ Total Freight">
-              </div>
-              <div class="form-group">
-                <label for="tripBaseFreight">Base Freight (for 12% Comm)</label>
-                <input type="number" id="tripBaseFreight" class="form-control" placeholder="₹ Eligible Base">
-              </div>
-            </div>
-            <div class="form-row">
               <div class="form-group">
                 <label for="tripTransporter">Transporter Name</label>
-                <input type="text" id="tripTransporter" class="form-control" placeholder="e.g. SR TRSP">
+                <input type="text" id="tripTransporter" class="form-control" placeholder="e.g. SR Logistics">
+              </div>
+            </div>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="tripSource">Origin (From) <span style="color:red;">*</span></label>
+                <input type="text" id="tripSource" class="form-control" placeholder="Origin City">
               </div>
               <div class="form-group">
-                <label for="tripAdvance">Advance Received</label>
-                <input type="number" id="tripAdvance" class="form-control" placeholder="₹ Advance Received">
+                <label for="tripDest">Destination (To) <span style="color:red;">*</span></label>
+                <input type="text" id="tripDest" class="form-control" placeholder="Destination City">
+              </div>
+            </div>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="tripFreightP1">P&amp;L Freight P1 (₹) <span style="color:red;">*</span></label>
+                <input type="number" id="tripFreightP1" class="form-control" placeholder="e.g. 175000">
+              </div>
+              <div class="form-group">
+                <label for="tripBaseFreight">Base Freight (12% Comm Basis) (₹)</label>
+                <input type="number" id="tripBaseFreight" class="form-control" placeholder="e.g. 155000">
+              </div>
+            </div>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="tripDiesel">En-route Diesel (₹)</label>
+                <input type="number" id="tripDiesel" class="form-control" placeholder="0">
+              </div>
+              <div class="form-group">
+                <label for="tripRoadExp">Trip Road Expenses (₹)</label>
+                <input type="number" id="tripRoadExp" class="form-control" placeholder="0">
               </div>
             </div>
           </div>
 
-          <!-- Fields: Diesel -->
+          <!-- Diesel Fields -->
           <div id="modalFieldsDiesel" style="display: none;">
-            <div class="form-group">
-              <label for="dieselDate">Fuel Date</label>
-              <input type="text" id="dieselDate" class="form-control" placeholder="e.g. 21-10-2026">
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="dieselDate">Fuel Date</label>
+                <input type="date" id="dieselDate" class="form-control">
+              </div>
+              <div class="form-group">
+                <label for="dieselPump">Petrol Pump / Station</label>
+                <input type="text" id="dieselPump" class="form-control" placeholder="e.g. IndianOil Station">
+              </div>
+            </div>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="dieselLiters">Liters</label>
+                <input type="number" step="0.01" id="dieselLiters" class="form-control" placeholder="e.g. 500">
+              </div>
+              <div class="form-group">
+                <label for="dieselRate">Rate / Liter (₹)</label>
+                <input type="number" step="0.01" id="dieselRate" class="form-control" placeholder="e.g. 90">
+              </div>
             </div>
             <div class="form-group">
-              <label for="dieselPump">Fuel Station / Pump</label>
-              <input type="text" id="dieselPump" class="form-control" placeholder="e.g. HPCL Highway Plaza">
-            </div>
-            <div class="form-group">
-              <label for="dieselAmount">Amount (₹)</label>
-              <input type="number" id="dieselAmount" class="form-control" placeholder="₹ Amount">
+              <label for="dieselAmount">Total Amount (₹) <span style="color:red;">*</span></label>
+              <input type="number" id="dieselAmount" class="form-control" placeholder="e.g. 45000">
             </div>
           </div>
 
-          <!-- Fields: Advance -->
+          <!-- Advance Fields -->
           <div id="modalFieldsAdvance" style="display: none;">
-            <div class="form-group">
-              <label for="advDate">Advance Date</label>
-              <input type="text" id="advDate" class="form-control" placeholder="e.g. 21-10-2026">
-            </div>
-            <div class="form-group">
-              <label for="advLocation">Location / Narration</label>
-              <input type="text" id="advLocation" class="form-control" placeholder="e.g. NAGAPUR ADV">
-            </div>
-            <div class="form-row">
+            <div class="form-grid-2">
               <div class="form-group">
-                <label for="advAmount">Advance Amount (₹)</label>
-                <input type="number" id="advAmount" class="form-control" placeholder="₹ Amount">
+                <label for="advDate">Date Given</label>
+                <input type="date" id="advDate" class="form-control">
               </div>
               <div class="form-group">
-                <label for="advMode">Payment Mode</label>
-                <select id="advMode" class="form-control">
+                <label for="advType">Payment Mode</label>
+                <select id="advType" class="form-control">
                   <option value="Cash">Cash</option>
-                  <option value="UPI">UPI / PhonePe</option>
-                  <option value="Bank Transfer">Bank Transfer (Home Trsf)</option>
-                  <option value="Dhaba">Dhaba / Pump Slip</option>
+                  <option value="Bank">Bank Transfer / UPI</option>
+                  <option value="Cheque">Cheque</option>
                 </select>
               </div>
             </div>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="advPurpose">Purpose</label>
+                <input type="text" id="advPurpose" class="form-control" placeholder="e.g. Trip Advance">
+              </div>
+              <div class="form-group">
+                <label for="advAmount">Advance Amount (₹) <span style="color:red;">*</span></label>
+                <input type="number" id="advAmount" class="form-control" placeholder="e.g. 15000">
+              </div>
+            </div>
           </div>
 
-          <!-- Fields: Expense -->
+          <!-- Road Expense Fields -->
           <div id="modalFieldsExpense" style="display: none;">
-            <div class="form-group">
-              <label for="expDesc">Expense Description</label>
-              <input type="text" id="expDesc" class="form-control" placeholder="e.g. HANMANA BODER">
-            </div>
-            <div class="form-row">
+            <div class="form-grid-2">
               <div class="form-group">
                 <label for="expCategory">Category</label>
                 <select id="expCategory" class="form-control">
-                  <option value="Border / Toll">Border / Toll</option>
-                  <option value="Police / Checking">Police / Checking</option>
-                  <option value="Kanta / Weighbridge">Kanta / Weighbridge</option>
-                  <option value="Labour / Loading">Labour / Loading</option>
-                  <option value="Tyre / Puncture">Tyre / Puncture</option>
-                  <option value="Greasing / Washing">Greasing / Washing</option>
-                  <option value="Pooja / Traditional">Pooja / Traditional</option>
-                  <option value="Accessories / Maintenance">Accessories / Maintenance</option>
+                  <option value="Toll / RTO">Toll / RTO</option>
+                  <option value="Police / Border">Police / Border Checkpost</option>
+                  <option value="Loading / Unloading">Loading / Unloading</option>
+                  <option value="Maintenance">Tyre / Greasing / Repairs</option>
+                  <option value="FastTag">FastTag Recharge</option>
+                  <option value="Miscellaneous">AddBlue / Other</option>
                 </select>
               </div>
               <div class="form-group">
-                <label for="expAmount">Amount (₹)</label>
-                <input type="number" id="expAmount" class="form-control" placeholder="₹ Amount">
+                <label for="expAmount">Expense Amount (₹) <span style="color:red;">*</span></label>
+                <input type="number" id="expAmount" class="form-control" placeholder="e.g. 2500">
               </div>
+            </div>
+            <div class="form-group">
+              <label for="expDesc">Description / Voucher Note</label>
+              <input type="text" id="expDesc" class="form-control" placeholder="Voucher description">
             </div>
           </div>
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="AppModule.closeModal()">Cancel</button>
-          <button type="submit" id="modalSubmitBtn" class="btn btn-primary">Save Entry</button>
+          <button id="cancelEntryModalBtn" class="btn btn-secondary" type="button">Cancel</button>
+          <button id="saveEntryModalBtn" class="btn btn-primary" type="submit">Save Record</button>
         </div>
       </form>
     </div>
-  </div>
+  </dialog>
 
-  <!-- 6. SETTINGS MODAL (ADMIN ONLY) -->
-  <div id="settingsModal" class="app-modal-overlay admin-only" style="display: none;">
-    <div class="app-modal-card" style="max-width: 650px;">
+  <!-- 4. ADD VEHICLE DIALOG -->
+  <dialog id="truckModal" class="modal-dialog">
+    <div class="modal-form-wrap">
       <div class="modal-header">
-        <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 1.15rem;">
-          ⚙️ Cloud Ledger &amp; System Settings
-          <span style="background: #1e3a8a; color: #ffffff; font-size: 0.7rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 4px; letter-spacing: 0.5px;">ADMIN ONLY</span>
-        </h3>
-        <button class="modal-close-btn" onclick="AppModule.closeModal()">✕</button>
+        <h2>🚛 Register New Vehicle</h2>
+        <button id="closeTruckModalBtn" class="modal-close-btn" type="button">✕</button>
       </div>
-      <form id="settingsForm">
+      <form id="addTruckForm" novalidate>
         <div class="modal-body">
-          <!-- Administrator Privilege Alert -->
-          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.8rem; color: #1e40af; line-height: 1.5;">
-            🛡️ <strong>Restricted Administrator View:</strong> These production Google Cloud links and settings are visible and accessible strictly to <strong>Admin (Shravan Kumar)</strong>. Standard operators (Rudra) cannot view or configure cloud infrastructure.
-          </div>
-
-          <!-- Quick Access Action Buttons for Live Google Cloud Assets -->
-          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem; margin-bottom: 1.25rem;">
-            <div style="font-size: 0.78rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 0.65rem;">
-              Verified Production Google Cloud Assets
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="truckRegInput">Registration Number <span style="color:red;">*</span></label>
+              <input type="text" id="truckRegInput" class="form-control" placeholder="e.g. AP39UD3564" style="text-transform: uppercase;" required>
             </div>
-            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-              <a id="settingQuickSheetLink" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="text-decoration: none; color: #065f46; background: #ecfdf5; border-color: #a7f3d0; font-weight: 600;">
-                📊 Google Sheet ↗
-              </a>
-              <a id="settingQuickProjectLink" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="text-decoration: none; color: #1e40af; background: #eff6ff; border-color: #bfdbfe; font-weight: 600;">
-                ⚡ Apps Script Project ↗
-              </a>
-              <a id="settingQuickEndpointLink" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="text-decoration: none; color: #6b21a8; background: #faf5ff; border-color: #e9d5ff; font-weight: 600;">
-                🌐 Web App API Endpoint ↗
-              </a>
-            </div>
-            <div style="margin-top: 0.65rem; font-size: 0.72rem; color: #64748b; line-height: 1.4;">
-              <strong>Active Deployment:</strong> Version 1 (Active) • <strong>ID:</strong> <code id="settingDeploymentIdDisplay" style="font-size: 0.72rem; background: #e2e8f0; padding: 1px 4px; border-radius: 3px;">Configured</code>
+            <div class="form-group">
+              <label for="truckModelInput">Model / Make</label>
+              <input type="text" id="truckModelInput" class="form-control" placeholder="e.g. BharatBenz 3528C">
             </div>
           </div>
-
-          <!-- Configurable Inputs -->
-          <div class="form-group" style="margin-bottom: 1.1rem;">
-            <label for="settingSheetUrl" style="font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 0.35rem; display: block;">
-              Dedicated Google Sheet URL (Cloud Spreadsheet)
-            </label>
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
-              <input type="url" id="settingSheetUrl" class="form-control" placeholder="https://docs.google.com/spreadsheets/d/.../edit" style="font-size: 0.85rem;">
-              <button type="button" class="btn btn-secondary" onclick="ApiModule.openGoogleSheet()" style="white-space: nowrap; font-size: 0.82rem;">
-                🔗 Open
-              </button>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="truckDriverInput">Assigned Driver Name</label>
+              <input type="text" id="truckDriverInput" class="form-control" placeholder="Driver Full Name">
             </div>
-            <small style="color: #64748b; font-size: 0.74rem; display: block; margin-top: 0.3rem;">
-              Dedicated Google Sheet ID: <code id="settingSheetIdDisplay">Configured</code>
-            </small>
+            <div class="form-group">
+              <label for="truckDriverPhoneInput">Driver Contact Phone</label>
+              <input type="text" id="truckDriverPhoneInput" class="form-control" placeholder="+91 98765 43210">
+            </div>
           </div>
-
-          <div class="form-group" style="margin-bottom: 1.1rem;">
-            <label for="settingGasEndpoint" style="font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 0.35rem; display: block;">
-              Google Apps Script Web App URL
-            </label>
-            <input type="url" id="settingGasEndpoint" class="form-control" placeholder="https://script.google.com/macros/s/.../exec" style="font-size: 0.85rem;">
-            <small style="color: #64748b; font-size: 0.74rem; display: block; margin-top: 0.3rem;">
-              Production Web App used for real-time synchronization with Google Sheets backend.
-            </small>
-          </div>
-
-          <div class="form-group" style="margin-top: 1.25rem; border-top: 1px solid #e2e8f0; padding-top: 1rem;">
-            <label style="font-weight: 600; font-size: 0.85rem; color: #b91c1c; margin-bottom: 0.35rem; display: block;">
-              Master Excel Data Reset (Admin Authorization Required)
-            </label>
-            <button type="button" class="btn btn-secondary" onclick="AppModule.restoreOriginalData()" style="color: #b91c1c; border-color: #fca5a5; font-size: 0.82rem;">
-              📋 Re-seed Verified Original Excel Data
-            </button>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="truckCapacityInput">Carrying Capacity</label>
+              <input type="text" id="truckCapacityInput" class="form-control" placeholder="35 Tons">
+            </div>
+            <div class="form-group">
+              <label for="truckRouteInput">Default Route</label>
+              <input type="text" id="truckRouteInput" class="form-control" placeholder="e.g. Hyderabad - Nagpur">
+            </div>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="AppModule.closeModal()">Close</button>
+          <button id="cancelTruckModalBtn" class="btn btn-secondary" type="button">Cancel</button>
+          <button type="submit" class="btn btn-primary">Register Vehicle</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- 5. ADMIN SETTINGS DIALOG -->
+  <dialog id="settingsModal" class="app-modal-overlay admin-only">
+    <div class="modal-form-wrap">
+      <div class="modal-header">
+        <h2>⚙️ Cloud Spreadsheet &amp; Project Settings</h2>
+        <button id="closeSettingsModalBtn" class="modal-close-btn" type="button">✕</button>
+      </div>
+      <form id="settingsForm" novalidate>
+        <div class="modal-body">
+          <div id="settingsAdminNotice" class="notice notice-info">
+            <strong>Administrator Access Verified:</strong> Only administrators can view and configure cloud spreadsheet integration.
+          </div>
+
+          <div class="form-group">
+            <label>Google Spreadsheet ID</label>
+            <input type="text" id="settingsSheetIdInput" class="form-control" readonly>
+            <div id="settingsSheetLinksRow" style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
+              <button type="button" id="openCloudSheetBtn" class="btn btn-secondary btn-sm">📊 Open Google Spreadsheet</button>
+              <button type="button" id="openScriptProjectBtn" class="btn btn-secondary btn-sm">⚡ Open Apps Script Editor</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="settingsGasUrlInput">Web App Deployment URL</label>
+            <input type="text" id="settingsGasUrlInput" class="form-control">
+          </div>
+
+          <div class="form-group">
+            <label>Data Backup &amp; Recovery</label>
+            <div style="display: flex; gap: 0.5rem;">
+              <button type="button" id="restoreOriginalDataBtn" class="btn btn-secondary btn-sm" style="color: var(--danger); border-color: #fca5a5;">
+                📋 Re-seed Verified Excel Master Data
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="cancelSettingsBtn" class="btn btn-secondary" type="button">Close</button>
           <button type="submit" class="btn btn-primary">Save Settings</button>
         </div>
       </form>
     </div>
-  </div>
+  </dialog>
 
-  <!-- 7. CHANGE PASSWORD MODAL -->
-  <div id="changePasswordModal" class="app-modal-overlay" style="display: none;">
-    <div class="app-modal-card" style="max-width: 420px;">
+  <!-- 6. CHANGE PASSWORD DIALOG -->
+  <dialog id="changePasswordModal" class="modal-dialog">
+    <div class="modal-form-wrap">
       <div class="modal-header">
-        <h3>🔑 Change User Password</h3>
-        <button class="modal-close-btn" onclick="AppModule.closeModal()">✕</button>
+        <h2>🔑 Change User Password</h2>
+        <button id="closePasswordModalBtn" class="modal-close-btn" type="button">✕</button>
       </div>
-      <form id="changePasswordForm">
+      <form id="changePasswordForm" novalidate>
         <div class="modal-body">
-          <div style="font-size: 0.88rem; color: #475569; margin-bottom: 1rem;">
-            Updating password for account: <strong id="changePwdUserDisplay" style="color: #1e3a8a;">Admin</strong>
+          <div style="font-size: 0.85rem; color: var(--muted); margin-bottom: 0.85rem;">
+            Updating password for account: <strong id="changePwdUserDisplay" style="color: var(--navy);">Admin</strong>
           </div>
-          <div class="form-group" style="margin-bottom: 1rem;">
+          <div class="form-group">
             <label for="newPasswordInput">New Password</label>
             <input type="password" id="newPasswordInput" class="form-control" placeholder="Enter new password" required minlength="4">
           </div>
           <div class="form-group">
             <label for="confirmPasswordInput">Confirm New Password</label>
-            <input type="password" id="confirmPasswordInput" class="form-control" placeholder="Re-enter new password" required minlength="4">
+            <input type="password" id="confirmPasswordInput" class="form-control" placeholder="Confirm new password" required minlength="4">
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="AppModule.closeModal()">Cancel</button>
+          <button id="cancelPasswordBtn" class="btn btn-secondary" type="button">Cancel</button>
           <button type="submit" class="btn btn-primary">Update Password</button>
         </div>
       </form>
     </div>
-  </div>
-
-  <!-- 8. TOAST NOTIFICATIONS CONTAINER -->
-  <div id="toastContainer" class="toast-container"></div>
-
-  <!-- 8. APPLICATION LOGIC SCRIPTS -->
-  <script src="js/data.js"></script>
-  <script src="js/calculations.js"></script>
-  <script src="js/auth.js"></script>
-  <script src="js/api.js"></script>
-  <script src="js/dashboard.js"></script>
-  <script src="js/table.js"></script>
-  <script src="js/app.js"></script>
-
+  </dialog>
 </body>
 </html>
-

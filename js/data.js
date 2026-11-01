@@ -1,637 +1,639 @@
 /**
  * Transport Brokerage Ledger Pvt Ltd
- * Enterprise Multi-Project, Multi-Truck Data Store (P2)
- *
- * Architecture:
- * - Multi-Project Management with dedicated Spreadsheet IDs
- * - Dynamic Unlimited Truck Fleet Support
- * - Date & Accounting Period Organization (Historical 2026-09, Active 2026-10, Future 2026-11)
- * - Preserved Authoritative Excel Records & Reconciliations
- * - Bidirectional Cloud Synchronization Reconciliation
+ * Multi-Project Data Storage & State Architecture (data.js)
  */
 
-const DataModule = (function () {
-  'use strict';
+const DataModule = (() => {
+  const MASTER_STORAGE_KEY = 'FLEET_LEDGER_P2_MASTER_V1';
 
-  const STORAGE_KEY_V2 = 'FLEET_LEDGER_P2_MASTER_V2';
-  const ACTIVE_PROJECT_KEY = 'FLEET_LEDGER_ACTIVE_PROJECT_ID_V2';
-
-  // Seed Data: Master Project 001 with TG15T6666 & TS15UE1122
-  const INITIAL_SEED = {
-    version: 2,
+  const DEFAULT_INITIAL_STATE = {
+    version: 3,
     lastUpdated: new Date().toISOString(),
+    activeProjectId: 'PRJ-001',
+    activePeriod: '2026-10',
+
+    accountingPeriods: [
+      { id: '2026-10', name: 'October 2026', period: "2026-10", status: 'Active' },
+      { id: '2026-09', name: 'September 2026', period: "2026-09", status: 'Closed' },
+      { id: '2026-11', name: 'November 2026', period: "2026-11", status: 'Upcoming' }
+    ],
+
     projects: [
       {
-        id: "PRJ-001",
-        name: "SR Transport Main Fleet",
-        description: "Primary commercial dual-truck operations (TG15T6666 & TS15UE1122)",
-        spreadsheetId: "1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4",
-        status: "Active",
-        createdAt: "2026-10-01",
-        accountingPeriods: [
-          { id: "2026-09", name: "September 2026", status: "Archived", startDate: "2026-09-01", endDate: "2026-09-30" },
-          { id: "2026-10", name: "October 2026", status: "Active", startDate: "2026-10-01", endDate: "2026-10-31" },
-          { id: "2026-11", name: "November 2026", status: "Planned", startDate: "2026-11-01", endDate: "2026-11-30" }
+        id: 'PRJ-001',
+        name: 'Project 001 - Hyderabad South',
+        description: 'Primary Southern Interstate Logistics Route',
+        spreadsheetId: '1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4',
+        createdAt: '2026-10-01'
+      }
+    ],
+
+    trucks: [
+      {
+        id: 'TG15T6666',
+        regNumber: 'TG15T6666',
+        driverId: 'DRV-001',
+        model: 'BharatBenz 3528C',
+        capacity: '35 Tons',
+        status: 'Active',
+        assignedRoute: 'Hyderabad - Nagpur - Raipur'
+      },
+      {
+        id: 'TS15UE1122',
+        regNumber: 'TS15UE1122',
+        driverId: 'DRV-002',
+        model: 'Tata Signa 3523',
+        capacity: '35 Tons',
+        status: 'Active',
+        assignedRoute: 'Hyderabad - Vijayawada'
+      }
+    ],
+
+    drivers: [
+      {
+        id: 'DRV-001',
+        name: 'Noor Allam',
+        phone: '+91 98765 43210',
+        truckId: 'TG15T6666',
+        commissionRate: 0.12,
+        status: 'Active'
+      },
+      {
+        id: 'DRV-002',
+        name: 'Allam Brother',
+        phone: '+91 98765 43211',
+        truckId: 'TS15UE1122',
+        commissionRate: 0.12,
+        status: 'Active'
+      }
+    ],
+
+    pnlData: {
+      'TG15T6666': {
+        truckId: 'TG15T6666',
+        driverName: 'Noor Allam',
+        period: 'October 2026',
+        oldBalance: 13800,
+        revenue: {
+          p1Freight: 382800,
+          baseFreight: 339500,
+          haltage: 0,
+          loadingCharges: 0,
+          detention: 0
+        },
+        expenses: {
+          dieselTotal: 132600,
+          claimedRoadExpenses: 28700,
+          itemizedRoadExpenses: 28735,
+          reconciliationDiff: 35,
+          roadTotalClaimed: 28700,
+          roadTotalItemized: 28735,
+          driverCommission: 40740,
+          fastagCharges: 40000,
+          addBlueCharges: 15000,
+          fixedTotal: 55000
+        },
+        trips: [
+          { id: 'TRP-66-1', date: '2026-10-02', transporter: 'SR Logistics', source: 'MDCL', destination: 'MADHAPURA', freightP1: 175000, baseFreight: 140000, dieselAmount: 62000, roadExpenses: 13500 },
+          { id: 'TRP-66-2', date: '2026-10-09', transporter: 'Interstate Carrier', source: 'AURGANGABAD', destination: 'HYD', freightP1: 108500, baseFreight: 108500, dieselAmount: 38000, roadExpenses: 8200 },
+          { id: 'TRP-66-3', date: '2026-10-15', transporter: 'South Trans', source: 'K"NAG', destination: 'KURNOOL', freightP1: 72300, baseFreight: 64000, dieselAmount: 18000, roadExpenses: 4500 },
+          { id: 'TRP-66-4', date: '2026-10-18', transporter: 'Local Line', source: 'KURNOOL', destination: 'MDCL', freightP1: 27000, baseFreight: 27000, dieselAmount: 14600, roadExpenses: 2500 }
         ],
-        activePeriod: "2026-10",
-        trucks: [
-          {
-            id: "TG15T6666",
-            regNumber: "TG15T6666",
-            driverName: "Noor Allam",
-            driverPhone: "+91 98480 12345",
-            status: "Active",
-            fixedExpenses: { fastTag: 40000, addBlueAndMisc: 15000 },
-            settlementParams: {
-              oldBalance: 13800,
-              oldBalanceNote: "OLD BALC SHANKAR WANT PAY",
-              settlementDate: "2026-10-20",
-              direction: "PAYABLE_TO_DRIVER",
-              claimedRoadExpenses: 28700,
-              itemizedRoadExpenses: 28735,
-              reconciliationDiff: 35
-            },
-            trips: [
-              // October 2026 Trips (P1)
-              { id: "T-6666-01", date: "2026-10-01", dates: "01-10-26 TO 06-10-26", period: "2026-10", from: "MDCL", to: "MADHAPURA", pnlFreight: 175000, baseFreight: 140000, transporter: "SR TRSP", advanceReceived: 130000, balanceDue: 45000, status: "Delivered" },
-              { id: "T-6666-02", date: "2026-10-09", dates: "09-10-26 TO 14-10-26", period: "2026-10", from: "AURGANGABAD", to: "HYD", pnlFreight: 108500, baseFreight: 108500, transporter: "SR TRSP", advanceReceived: 90000, balanceDue: 18500, status: "Delivered" },
-              { id: "T-6666-03", date: "2026-10-15", dates: "15-10-26 TO 17-10-26", period: "2026-10", from: "K\"NAG", to: "KURNOOL", pnlFreight: 72300, baseFreight: 64000, transporter: "SR TRSP", advanceReceived: 50000, balanceDue: 22300, status: "Delivered" },
-              { id: "T-6666-04", date: "2026-10-18", dates: "18-10-26 TO 19-10-26", period: "2026-10", from: "KURNOOL", to: "MDCL", pnlFreight: 27000, baseFreight: 27000, transporter: "SR TRSP", advanceReceived: 20000, balanceDue: 7000, status: "Delivered" },
-              // September 2026 Historical Archive (Sheet1 in original Excel)
-              { id: "T-6666-S01", date: "2026-09-01", dates: "01-09-26", period: "2026-09", from: "MDCL", to: "PATNA", pnlFreight: 126000, baseFreight: 126000, transporter: "SR TRSP", advanceReceived: 100000, balanceDue: 26000, status: "Archived" },
-              { id: "T-6666-S02", date: "2026-09-03", dates: "03-09-26", period: "2026-09", from: "RAIPUR", to: "MDCL", pnlFreight: 94500, baseFreight: 94500, transporter: "SR TRSP", advanceReceived: 80000, balanceDue: 14500, status: "Archived" },
-              { id: "T-6666-S03", date: "2026-09-10", dates: "10-09-26", period: "2026-09", from: "MDCL", to: "COOCHBIHAR", pnlFreight: 185000, baseFreight: 185000, transporter: "SR TRSP", advanceReceived: 150000, balanceDue: 35000, status: "Archived" },
-              { id: "T-6666-S04", date: "2026-09-17", dates: "17-09-26", period: "2026-09", from: "RAIGANJ", to: "WARASEONI", pnlFreight: 80500, baseFreight: 80500, transporter: "SR TRSP", advanceReceived: 65000, balanceDue: 15500, status: "Archived" },
-              { id: "T-6666-S05", date: "2026-09-27", dates: "27-09-26", period: "2026-09", from: "WARASEONI", to: "MDCL", pnlFreight: 71750, baseFreight: 71750, transporter: "SR TRSP", advanceReceived: 60000, balanceDue: 11750, status: "Archived" }
-            ],
-            diesel: [
-              // October 2026 Diesel Entries
-              { id: "D-6666-01", date: "2026-10-02", period: "2026-10", pump: "HPCL Highway Plaza", amount: 30500 },
-              { id: "D-6666-02", date: "2026-10-07", period: "2026-10", pump: "BPCL Express Pump", amount: 30500 },
-              { id: "D-6666-03", date: "2026-10-11", period: "2026-10", pump: "IOCL Grand Trunk", amount: 31600 },
-              { id: "D-6666-04", date: "2026-10-15", period: "2026-10", pump: "Reliance Fuel Care", amount: 13000 },
-              { id: "D-6666-05", date: "2026-10-18", period: "2026-10", pump: "HPCL Mega Diesel Hub", amount: 27000 }
-            ],
-            driverAdvances: [
-              // October 2026 Advances
-              { id: "ADV-6666-01", date: "2026-10-02", period: "2026-10", location: "NAGAPUR ADV", amount: 5000, mode: "Cash" },
-              { id: "ADV-6666-02", date: "2026-10-04", period: "2026-10", location: "VARANSANI ADV", amount: 6000, mode: "Cash" },
-              { id: "ADV-6666-03", date: "2026-10-05", period: "2026-10", location: "MOBILE PH", amount: 2000, mode: "UPI" },
-              { id: "ADV-6666-04", date: "2026-10-08", period: "2026-10", location: "BAHAGALPUR", amount: 3000, mode: "Cash" },
-              { id: "ADV-6666-05", date: "2026-10-11", period: "2026-10", location: "VARANSANI ADV", amount: 7000, mode: "Cash" },
-              { id: "ADV-6666-06", date: "2026-10-12", period: "2026-10", location: "NAGAPUR ADV", amount: 3000, mode: "Cash" },
-              { id: "ADV-6666-07", date: "2026-10-13", period: "2026-10", location: "CHEGUNTA JAFFER DABA", amount: 2000, mode: "Dhaba" },
-              { id: "ADV-6666-08", date: "2026-10-16", period: "2026-10", location: "HOME TRSF", amount: 10000, mode: "Bank Transfer" },
-              { id: "ADV-6666-09", date: "2026-10-17", period: "2026-10", location: "MDCL ADV", amount: 5000, mode: "Cash" },
-              { id: "ADV-6666-10", date: "2026-10-18", period: "2026-10", location: "MOBILE PH", amount: 35200, mode: "UPI" }
-            ],
-            roadExpenses: [
-              // October 2026 Road Expenses (37 Verified Items)
-              { id: "EXP-6666-01", date: "2026-10-01", period: "2026-10", desc: "HYD KANTA", amount: 400, category: "Kanta / Weighbridge" },
-              { id: "EXP-6666-02", date: "2026-10-01", period: "2026-10", desc: "TARPAL", amount: 400, category: "Accessories / Maintenance" },
-              { id: "EXP-6666-03", date: "2026-10-02", period: "2026-10", desc: "BANDARKOLA BODER", amount: 900, category: "Border / Toll" },
-              { id: "EXP-6666-04", date: "2026-10-02", period: "2026-10", desc: "MANSAR BODER", amount: 2600, category: "Border / Toll" },
-              { id: "EXP-6666-05", date: "2026-10-03", period: "2026-10", desc: "KHAWAS BODER", amount: 700, category: "Border / Toll" },
-              { id: "EXP-6666-06", date: "2026-10-03", period: "2026-10", desc: "HANMANA BODER", amount: 900, category: "Border / Toll" },
-              { id: "EXP-6666-07", date: "2026-10-03", period: "2026-10", desc: "HEAD LIGHT BULB", amount: 520, category: "Accessories / Maintenance" },
-              { id: "EXP-6666-08", date: "2026-10-04", period: "2026-10", desc: "KAMANI BOLT", amount: 180, category: "Accessories / Maintenance" },
-              { id: "EXP-6666-09", date: "2026-10-04", period: "2026-10", desc: "BIHAR BODER", amount: 900, category: "Border / Toll" },
-              { id: "EXP-6666-10", date: "2026-10-04", period: "2026-10", desc: "ARA LOUBAR SLIP", amount: 200, category: "Labour / Loading" },
-              { id: "EXP-6666-11", date: "2026-10-05", period: "2026-10", desc: "BEETA PHOOL", amount: 300, category: "Pooja / Traditional" },
-              { id: "EXP-6666-12", date: "2026-10-05", period: "2026-10", desc: "SAMSATIPUR PHOOL", amount: 400, category: "Pooja / Traditional" },
-              { id: "EXP-6666-13", date: "2026-10-05", period: "2026-10", desc: "BIHAR POLICE", amount: 450, category: "Police / Checking" },
-              { id: "EXP-6666-14", date: "2026-10-05", period: "2026-10", desc: "BIHAR PUJA PARCHI", amount: 980, category: "Pooja / Traditional" },
-              { id: "EXP-6666-15", date: "2026-10-06", period: "2026-10", desc: "PARKING", amount: 350, category: "Border / Toll" },
-              { id: "EXP-6666-16", date: "2026-10-06", period: "2026-10", desc: "GERACE", amount: 300, category: "Greasing / Washing" },
-              { id: "EXP-6666-17", date: "2026-10-06", period: "2026-10", desc: "TYRE PUMCHAR", amount: 300, category: "Tyre / Puncture" },
-              { id: "EXP-6666-18", date: "2026-10-07", period: "2026-10", desc: "JABALPUR ENTRY", amount: 1500, category: "Border / Toll" },
-              { id: "EXP-6666-19", date: "2026-10-08", period: "2026-10", desc: "BHAGALPUR PULL", amount: 300, category: "Border / Toll" },
-              { id: "EXP-6666-20", date: "2026-10-08", period: "2026-10", desc: "BHAGALPUR KANTA", amount: 180, category: "Kanta / Weighbridge" },
-              { id: "EXP-6666-21", date: "2026-10-09", period: "2026-10", desc: "POJJA PACHEE", amount: 670, category: "Pooja / Traditional" },
-              { id: "EXP-6666-22", date: "2026-10-10", period: "2026-10", desc: "AURGANABAD LOUDING", amount: 1100, category: "Labour / Loading" },
-              { id: "EXP-6666-23", date: "2026-10-10", period: "2026-10", desc: "KANTA", amount: 300, category: "Kanta / Weighbridge" },
-              { id: "EXP-6666-24", date: "2026-10-10", period: "2026-10", desc: "MUNSI AURGANBAD", amount: 450, category: "Labour / Loading" },
-              { id: "EXP-6666-25", date: "2026-10-11", period: "2026-10", desc: "BIHAR BODER", amount: 900, category: "Border / Toll" },
-              { id: "EXP-6666-26", date: "2026-10-11", period: "2026-10", desc: "HANMANA BODER", amount: 900, category: "Border / Toll" },
-              { id: "EXP-6666-27", date: "2026-10-12", period: "2026-10", desc: "KHAWAS BODER", amount: 700, category: "Border / Toll" },
-              { id: "EXP-6666-28", date: "2026-10-12", period: "2026-10", desc: "BANDARKOLA BODER", amount: 4500, category: "Border / Toll" },
-              { id: "EXP-6666-29", date: "2026-10-13", period: "2026-10", desc: "BANDARKOLA BODER", amount: 700, category: "Border / Toll" },
-              { id: "EXP-6666-30", date: "2026-10-14", period: "2026-10", desc: "LORRY RUBBER STOP", amount: 1800, category: "Accessories / Maintenance" },
-              { id: "EXP-6666-31", date: "2026-10-15", period: "2026-10", desc: "HYD TRSP LOUDING", amount: 300, category: "Labour / Loading" },
-              { id: "EXP-6666-32", date: "2026-10-15", period: "2026-10", desc: "GERACE", amount: 600, category: "Greasing / Washing" },
-              { id: "EXP-6666-33", date: "2026-10-16", period: "2026-10", desc: "TYRE PUMCHAR", amount: 250, category: "Tyre / Puncture" },
-              { id: "EXP-6666-34", date: "2026-10-16", period: "2026-10", desc: "TUBE", amount: 1450, category: "Accessories / Maintenance" },
-              { id: "EXP-6666-35", date: "2026-10-17", period: "2026-10", desc: "KURNOOL UNLODING", amount: 480, category: "Labour / Loading" },
-              { id: "EXP-6666-36", date: "2026-10-18", period: "2026-10", desc: "KURNOOL OVER LOUD TOLL", amount: 675, category: "Border / Toll" },
-              { id: "EXP-6666-37", date: "2026-10-19", period: "2026-10", desc: "LOUDING DASSHERA MAMUL", amount: 200, category: "Pooja / Traditional" }
-            ]
-          },
-          {
-            id: "TS15UE1122",
-            regNumber: "TS15UE1122",
-            driverName: "Allam Brother",
-            driverPhone: "+91 98480 67890",
-            status: "Active",
-            fixedExpenses: { fastTag: 25000, addBlueAndMisc: 20000 },
-            settlementParams: {
-              oldBalance: 62340,
-              oldBalanceNote: "OLD ALLAM WANT PAY",
-              settlementDate: "2026-10-20",
-              direction: "PAYABLE_BY_DRIVER",
-              claimedRoadExpenses: 11790,
-              itemizedRoadExpenses: 11790,
-              reconciliationDiff: 0
-            },
-            trips: [
-              // October 2026 Trips (P1)
-              { id: "T-1122-01", date: "2026-10-04", dates: "04-10-26 TO 06-10-26", period: "2026-10", from: "MDCL", to: "CHEGUNTA", pnlFreight: 15000, baseFreight: 10000, transporter: "SR TRSP", advanceReceived: 10000, balanceDue: 5000, status: "Delivered" },
-              { id: "T-1122-02", date: "2026-10-06", dates: "06-10-26 TO 09-10-26", period: "2026-10", from: "MDCL", to: "MUZZFARPUR", pnlFreight: 141000, baseFreight: 114000, transporter: "SR TRSP", advanceReceived: 110000, balanceDue: 31000, status: "Delivered" },
-              { id: "T-1122-03", date: "2026-10-11", dates: "11-10-26 TO 13-10-26", period: "2026-10", from: "JABALPUR", to: "BHONIGIRI", pnlFreight: 80000, baseFreight: 75000, transporter: "SR TRSP", advanceReceived: 60000, balanceDue: 20000, status: "Delivered" },
-              // September 2026 Historical Archive (Sheet2 in original Excel)
-              { id: "T-1122-S01", date: "2026-09-01", dates: "01-09-26", period: "2026-09", from: "MYSURU", to: "LUCKNOW", pnlFreight: 148000, baseFreight: 148000, transporter: "SR TRSP", advanceReceived: 120000, balanceDue: 28000, status: "Archived" },
-              { id: "T-1122-S02", date: "2026-09-07", dates: "07-09-26", period: "2026-09", from: "LUCKNOW", to: "MDCL", pnlFreight: 87000, baseFreight: 87000, transporter: "SR TRSP", advanceReceived: 70000, balanceDue: 17000, status: "Archived" },
-              { id: "T-1122-S03", date: "2026-09-22", dates: "22-09-26", period: "2026-09", from: "IBRAHIMPATAM", to: "MDCL", pnlFreight: 15000, baseFreight: 15000, transporter: "SR TRSP", advanceReceived: 10000, balanceDue: 5000, status: "Archived" },
-              { id: "T-1122-S04", date: "2026-09-30", dates: "30-09-26 TO 03-10-26", period: "2026-09", from: "PATNA", to: "MDCL", pnlFreight: 94500, baseFreight: 94500, transporter: "SR TRSP", advanceReceived: 75000, balanceDue: 19500, status: "Archived" }
-            ],
-            diesel: [
-              // October 2026 Diesel Entries
-              { id: "D-1122-01", date: "2026-10-04", period: "2026-10", pump: "BPCL Express Highway", amount: 24000 },
-              { id: "D-1122-02", date: "2026-10-08", period: "2026-10", pump: "HPCL City Border", amount: 19000 },
-              { id: "D-1122-03", date: "2026-10-11", period: "2026-10", pump: "IOCL National Route", amount: 23000 },
-              { id: "D-1122-04", date: "2026-10-14", period: "2026-10", pump: "Reliance Petro Station", amount: 10000 },
-              { id: "D-1122-05", date: "2026-10-17", period: "2026-10", pump: "BPCL Super Hub", amount: 27000 }
-            ],
-            driverAdvances: [
-              // October 2026 Advances
-              { id: "ADV-1122-01", date: "2026-10-06", period: "2026-10", location: "MDCL ADV", amount: 2500, mode: "Cash" },
-              { id: "ADV-1122-02", date: "2026-10-07", period: "2026-10", location: "NAGAPUR", amount: 5000, mode: "Cash" },
-              { id: "ADV-1122-03", date: "2026-10-08", period: "2026-10", location: "ADVANCE", amount: 5000, mode: "Cash" },
-              { id: "ADV-1122-04", date: "2026-10-08", period: "2026-10", location: "HOME TRSF", amount: 20000, mode: "Bank Transfer" },
-              { id: "ADV-1122-05", date: "2026-10-10", period: "2026-10", location: "ADVANCE", amount: 5000, mode: "Cash" },
-              { id: "ADV-1122-06", date: "2026-10-14", period: "2026-10", location: "CHANDRAPUR", amount: 4000, mode: "Cash" }
-            ],
-            roadExpenses: [
-              // October 2026 Road Expenses (22 Verified Items)
-              { id: "EXP-1122-01", date: "2026-10-04", period: "2026-10", desc: "POLICE PARCHI", amount: 430, category: "Police / Checking" },
-              { id: "EXP-1122-02", date: "2026-10-04", period: "2026-10", desc: "MOHINA BODER", amount: 500, category: "Border / Toll" },
-              { id: "EXP-1122-03", date: "2026-10-05", period: "2026-10", desc: "ARRA LABOUR", amount: 200, category: "Labour / Loading" },
-              { id: "EXP-1122-04", date: "2026-10-05", period: "2026-10", desc: "HANMANA BODER", amount: 700, category: "Border / Toll" },
-              { id: "EXP-1122-05", date: "2026-10-05", period: "2026-10", desc: "JABALPUR CHAI PANI", amount: 200, category: "Labour / Loading" },
-              { id: "EXP-1122-06", date: "2026-10-06", period: "2026-10", desc: "KHAWASA BODER", amount: 700, category: "Border / Toll" },
-              { id: "EXP-1122-07", date: "2026-10-06", period: "2026-10", desc: "MANASAR BODER", amount: 900, category: "Border / Toll" },
-              { id: "EXP-1122-08", date: "2026-10-06", period: "2026-10", desc: "CHANDARPUR BODER", amount: 900, category: "Border / Toll" },
-              { id: "EXP-1122-09", date: "2026-10-07", period: "2026-10", desc: "CHANDARPUR PS", amount: 300, category: "Police / Checking" },
-              { id: "EXP-1122-10", date: "2026-10-07", period: "2026-10", desc: "TYRE PUMCHAR", amount: 650, category: "Tyre / Puncture" },
-              { id: "EXP-1122-11", date: "2026-10-07", period: "2026-10", desc: "GREACE", amount: 300, category: "Greasing / Washing" },
-              { id: "EXP-1122-12", date: "2026-10-08", period: "2026-10", desc: "MDCL KANTA", amount: 100, category: "Kanta / Weighbridge" },
-              { id: "EXP-1122-13", date: "2026-10-08", period: "2026-10", desc: "PANDARKOLA BODER", amount: 700, category: "Border / Toll" },
-              { id: "EXP-1122-14", date: "2026-10-09", period: "2026-10", desc: "MANASAR BODER", amount: 900, category: "Border / Toll" },
-              { id: "EXP-1122-15", date: "2026-10-10", period: "2026-10", desc: "KHAWASA BODER", amount: 700, category: "Border / Toll" },
-              { id: "EXP-1122-16", date: "2026-10-11", period: "2026-10", desc: "HANMANA BODER", amount: 900, category: "Border / Toll" },
-              { id: "EXP-1122-17", date: "2026-10-11", period: "2026-10", desc: "MOHINA BODER", amount: 800, category: "Border / Toll" },
-              { id: "EXP-1122-18", date: "2026-10-12", period: "2026-10", desc: "ARRA LABOUR", amount: 200, category: "Labour / Loading" },
-              { id: "EXP-1122-19", date: "2026-10-12", period: "2026-10", desc: "CHAPPRA BODER", amount: 400, category: "Border / Toll" },
-              { id: "EXP-1122-20", date: "2026-10-13", period: "2026-10", desc: "PS KACHARA", amount: 380, category: "Police / Checking" },
-              { id: "EXP-1122-21", date: "2026-10-13", period: "2026-10", desc: "PUJJA PARCHI", amount: 630, category: "Pooja / Traditional" },
-              { id: "EXP-1122-22", date: "2026-10-14", period: "2026-10", desc: "GREACE", amount: 300, category: "Greasing / Washing" }
-            ]
-          }
+        dieselLogs: [
+          { id: 'DSL-66-1', date: '2026-10-02', pump: 'IndianOil Hyd', liters: 338.89, rate: 90, amount: 30500 },
+          { id: 'DSL-66-2', date: '2026-10-08', pump: 'BPCL Nagpur', liters: 338.89, rate: 90, amount: 30500 },
+          { id: 'DSL-66-3', date: '2026-10-14', pump: 'HPCL Raipur', liters: 351.11, rate: 90, amount: 31600 },
+          { id: 'DSL-66-4', date: '2026-10-17', pump: 'IndianOil Kurnool', liters: 144.44, rate: 90, amount: 13000 },
+          { id: 'DSL-66-5', date: '2026-10-19', pump: 'Reliance Hyd', liters: 300.00, rate: 90, amount: 27000 }
+        ],
+        advances: [
+          { id: 'ADV-66-1', date: '2026-10-01', type: 'Cash', purpose: 'NAGAPUR ADV', amount: 5000 },
+          { id: 'ADV-66-2', date: '2026-10-03', type: 'Bank', purpose: 'VARANSANI ADV', amount: 6000 },
+          { id: 'ADV-66-3', date: '2026-10-05', type: 'Cash', purpose: 'MOBILE PH', amount: 2000 },
+          { id: 'ADV-66-4', date: '2026-10-08', type: 'Cash', purpose: 'BAHAGALPUR', amount: 3000 },
+          { id: 'ADV-66-5', date: '2026-10-10', type: 'Bank', purpose: 'VARANSANI ADV', amount: 7000 },
+          { id: 'ADV-66-6', date: '2026-10-12', type: 'Cash', purpose: 'NAGAPUR ADV', amount: 3000 },
+          { id: 'ADV-66-7', date: '2026-10-14', type: 'Cash', purpose: 'CHEGUNTA JAFFER DABA', amount: 2000 },
+          { id: 'ADV-66-8', date: '2026-10-16', type: 'Bank', purpose: 'HOME TRSF', amount: 10000 },
+          { id: 'ADV-66-9', date: '2026-10-18', type: 'Cash', purpose: 'MDCL ADV', amount: 5000 },
+          { id: 'ADV-66-10', date: '2026-10-20', type: 'Cash', purpose: 'MOBILE PH', amount: 35200 }
+        ],
+        roadExpenseItems: [
+          { id: 'RXP-66-1', date: '2026-10-03', category: 'Toll / RTO', desc: 'HYD KANTA + TARPAL', amount: 800 },
+          { id: 'RXP-66-2', date: '2026-10-08', category: 'Police / Border', desc: 'Borders & Checks', amount: 4200 },
+          { id: 'RXP-66-3', date: '2026-10-15', category: 'Loading / Unloading', desc: 'Labor & Vouchers', amount: 23735 }
+        ],
+        otherExpenses: [
+          { id: 'OXP-66-1', date: '2026-10-05', category: 'FastTag', desc: 'FastTag Toll Recharge', amount: 40000 },
+          { id: 'OXP-66-2', date: '2026-10-20', category: 'Miscellaneous', desc: 'AddBlue & Maintenance', amount: 15000 }
+        ]
+      },
+
+      'TS15UE1122': {
+        truckId: 'TS15UE1122',
+        driverName: 'Allam Brother',
+        period: 'October 2026',
+        oldBalance: 62340,
+        revenue: {
+          p1Freight: 236000,
+          baseFreight: 199000,
+          haltage: 0,
+          loadingCharges: 0,
+          detention: 0
+        },
+        expenses: {
+          dieselTotal: 103000,
+          claimedRoadExpenses: 11790,
+          itemizedRoadExpenses: 11790,
+          reconciliationDiff: 0,
+          roadTotalClaimed: 11790,
+          roadTotalItemized: 11790,
+          driverCommission: 23880,
+          fastagCharges: 25000,
+          addBlueCharges: 20000,
+          fixedTotal: 45000
+        },
+        trips: [
+          { id: 'TRP-11-1', date: '2026-10-04', transporter: 'SR Logistics', source: 'MDCL', destination: 'CHEGUNTA', freightP1: 15000, baseFreight: 10000, dieselAmount: 24000, roadExpenses: 2500 },
+          { id: 'TRP-11-2', date: '2026-10-06', transporter: 'Interstate Carrier', source: 'MDCL', destination: 'MUZZFARPUR', freightP1: 141000, baseFreight: 114000, dieselAmount: 42000, roadExpenses: 5290 },
+          { id: 'TRP-11-3', date: '2026-10-11', transporter: 'East Freight', source: 'JABALPUR', destination: 'BHONIGIRI', freightP1: 80000, baseFreight: 75000, dieselAmount: 37000, roadExpenses: 4000 }
+        ],
+        dieselLogs: [
+          { id: 'DSL-11-1', date: '2026-10-05', pump: 'IndianOil Hyd', liters: 266.67, rate: 90, amount: 24000 },
+          { id: 'DSL-11-2', date: '2026-10-09', pump: 'HPCL Vijayawada', liters: 211.11, rate: 90, amount: 19000 },
+          { id: 'DSL-11-3', date: '2026-10-12', pump: 'BPCL Jabalpur', liters: 255.56, rate: 90, amount: 23000 },
+          { id: 'DSL-11-4', date: '2026-10-16', pump: 'IndianOil Bhonigiri', liters: 111.11, rate: 90, amount: 10000 },
+          { id: 'DSL-11-5', date: '2026-10-18', pump: 'Reliance Hyd', liters: 300.00, rate: 90, amount: 27000 }
+        ],
+        advances: [
+          { id: 'ADV-11-1', date: '2026-10-04', type: 'Cash', purpose: 'MDCL ADV', amount: 2500 },
+          { id: 'ADV-11-2', date: '2026-10-06', type: 'Cash', purpose: 'NAGAPUR', amount: 5000 },
+          { id: 'ADV-11-3', date: '2026-10-08', type: 'Cash', purpose: 'EN ROUTE', amount: 5000 },
+          { id: 'ADV-11-4', date: '2026-10-10', type: 'Bank', purpose: 'HOME TRSF', amount: 20000 },
+          { id: 'ADV-11-5', date: '2026-10-13', type: 'Cash', purpose: 'JABALPUR', amount: 5000 },
+          { id: 'ADV-11-6', date: '2026-10-15', type: 'Cash', purpose: 'CHANDRAPUR', amount: 4000 }
+        ],
+        roadExpenseItems: [
+          { id: 'RXP-11-1', date: '2026-10-06', category: 'Toll / RTO', desc: 'Police Parchi & Tolls', amount: 4300 },
+          { id: 'RXP-11-2', date: '2026-10-14', category: 'Loading / Unloading', desc: 'Labor & Checkpost Vouchers', amount: 7490 }
+        ],
+        otherExpenses: [
+          { id: 'OXP-11-1', date: '2026-10-05', category: 'FastTag', desc: 'FastTag Toll Recharge', amount: 25000 },
+          { id: 'OXP-11-2', date: '2026-10-20', category: 'Miscellaneous', desc: 'AddBlue & Maintenance', amount: 20000 }
         ]
       }
-    ]
+    }
   };
 
-  function getStore() {
+  let store = null;
+
+  function loadStateFromStorage() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY_V2);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && parsed.projects && parsed.projects.length > 0) {
-          return parsed;
-        }
+      const serialized = localStorage.getItem(MASTER_STORAGE_KEY);
+      if (serialized) {
+        store = JSON.parse(serialized);
+      } else {
+        store = JSON.parse(JSON.stringify(DEFAULT_INITIAL_STATE));
+        persistState();
       }
     } catch (e) {
-      console.warn('LocalStorage parse error, falling back to seed:', e);
+      store = JSON.parse(JSON.stringify(DEFAULT_INITIAL_STATE));
     }
-    const fresh = JSON.parse(JSON.stringify(INITIAL_SEED));
-    saveStore(fresh);
-    return fresh;
+    return store;
   }
 
-  function saveStore(store) {
+  function persistState() {
+    if (!store) return;
     store.lastUpdated = new Date().toISOString();
-    localStorage.setItem(STORAGE_KEY_V2, JSON.stringify(store));
-    if (window.ApiModule && typeof ApiModule.broadcastLocalChange === 'function') {
-      ApiModule.broadcastLocalChange(store);
-    }
+    try {
+      localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(store));
+    } catch (e) {}
   }
 
-  // --- Project Management ---
+  function getStore() {
+    if (!store) loadStateFromStorage();
+    return store;
+  }
+
+  function saveStore(newStore) {
+    if (!newStore) return;
+    store = newStore;
+    persistState();
+  }
+
+  // --- Multi-Project Management (Test 2) ---
   function getProjects() {
-    return getStore().projects;
+    return getStore().projects || [];
   }
 
-  function getCurrentProjectId() {
-    return localStorage.getItem(ACTIVE_PROJECT_KEY) || "PRJ-001";
+  function getActiveProject() {
+    const s = getStore();
+    return (s.projects || []).find(p => p.id === s.activeProjectId) || s.projects[0];
   }
 
   function setCurrentProjectId(projectId) {
-    localStorage.setItem(ACTIVE_PROJECT_KEY, projectId);
-  }
-
-  function getCurrentProject() {
-    const store = getStore();
-    const activeId = getCurrentProjectId();
-    return store.projects.find(p => p.id === activeId) || store.projects[0];
-  }
-
-  function addProject(project) {
-    const store = getStore();
-    if (!project.id) {
-      project.id = "PRJ-" + String(store.projects.length + 1).padStart(3, '0');
+    const s = getStore();
+    const prj = (s.projects || []).find(p => p.id === projectId);
+    if (prj) {
+      s.activeProjectId = projectId;
+      persistState();
+      return true;
     }
-    if (!project.status) project.status = "Active";
-    if (!project.createdAt) project.createdAt = new Date().toISOString().slice(0, 10);
-    if (!project.accountingPeriods) {
-      project.accountingPeriods = [
-        { id: "2026-10", name: "October 2026", status: "Active", startDate: "2026-10-01", endDate: "2026-10-31" }
-      ];
-    }
-    if (!project.activePeriod) project.activePeriod = "2026-10";
-    if (!project.trucks) project.trucks = [];
-    store.projects.push(project);
-    saveStore(store);
-    setCurrentProjectId(project.id);
-    return project;
+    return false;
   }
 
-  function updateProject(projectId, updatedData) {
-    const store = getStore();
-    const idx = store.projects.findIndex(p => p.id === projectId);
-    if (idx === -1) return false;
-    store.projects[idx] = Object.assign({}, store.projects[idx], updatedData);
-    saveStore(store);
-    return true;
+  function addProject(prj) {
+    const s = getStore();
+    const newId = 'PRJ-' + String(s.projects.length + 1).padStart(3, '0');
+    const newPrj = {
+      id: newId,
+      name: prj.name,
+      description: prj.description || '',
+      spreadsheetId: prj.spreadsheetId || '',
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+    s.projects.push(newPrj);
+    persistState();
+    return newPrj;
   }
 
-  function deleteProject(projectId) {
-    const store = getStore();
-    if (store.projects.length <= 1) {
-      alert("Cannot delete the only project in the system.");
-      return false;
-    }
-    store.projects = store.projects.filter(p => p.id !== projectId);
-    if (getCurrentProjectId() === projectId) {
-      setCurrentProjectId(store.projects[0].id);
-    }
-    saveStore(store);
-    return true;
+  // --- Dynamic Unlimited Fleet / Truck Support (Test 3) ---
+  function getTrucks() {
+    return getStore().trucks || [];
   }
 
-  // --- Dynamic Fleet / Trucks ---
-  function getTrucks(projectId) {
-    const prj = projectId ? getStore().projects.find(p => p.id === projectId) : getCurrentProject();
-    return prj ? prj.trucks : [];
+  function getTruckById(truckId) {
+    return getTrucks().find(t => t.id === truckId);
   }
 
-  function getTruck(truckId, projectId) {
-    const trucks = getTrucks(projectId);
-    return trucks.find(t => t.id === truckId || t.regNumber === truckId) || null;
-  }
-
-  function addTruck(truckData, projectId) {
-    const store = getStore();
-    const prj = projectId ? store.projects.find(p => p.id === projectId) : store.projects.find(p => p.id === getCurrentProjectId());
-    if (!prj) return false;
-
-    const truckId = (truckData.id || truckData.regNumber || "TRK-" + Date.now()).toUpperCase().trim();
-    if (prj.trucks.some(t => t.id === truckId)) {
-      alert("Truck with ID " + truckId + " already exists!");
-      return false;
-    }
+  function addTruck(truck) {
+    const s = getStore();
+    if (s.trucks.find(t => t.id === truck.id)) return false;
 
     const newTruck = {
-      id: truckId,
-      regNumber: truckData.regNumber || truckId,
-      driverName: truckData.driverName || "Driver " + truckId,
-      driverPhone: truckData.driverPhone || "",
-      status: truckData.status || "Active",
-      fixedExpenses: {
-        fastTag: Number(truckData.fastTag) || 0,
-        addBlueAndMisc: Number(truckData.addBlueAndMisc) || 0
-      },
-      settlementParams: {
-        oldBalance: Number(truckData.oldBalance) || 0,
-        oldBalanceNote: truckData.oldBalanceNote || "Initial Balance",
-        settlementDate: new Date().toISOString().slice(0, 10),
-        direction: (Number(truckData.oldBalance) || 0) >= 0 ? "PAYABLE_TO_DRIVER" : "PAYABLE_BY_DRIVER",
-        claimedRoadExpenses: 0,
-        itemizedRoadExpenses: 0,
-        reconciliationDiff: 0
-      },
-      trips: [],
-      diesel: [],
-      driverAdvances: [],
-      roadExpenses: []
+      id: truck.id,
+      regNumber: truck.regNumber || truck.id,
+      driverId: truck.driverId || '',
+      model: truck.model || 'Commercial Carrier',
+      capacity: truck.capacity || '35 Tons',
+      status: truck.status || 'Active',
+      assignedRoute: truck.assignedRoute || 'Interstate Route'
     };
+    s.trucks.push(newTruck);
 
-    prj.trucks.push(newTruck);
-    saveStore(store);
+    if (!s.pnlData[truck.id]) {
+      s.pnlData[truck.id] = {
+        truckId: truck.id,
+        driverName: truck.driverName || '',
+        period: s.activePeriod,
+        oldBalance: 0,
+        revenue: { p1Freight: 0, baseFreight: 0, haltage: 0, loadingCharges: 0, detention: 0 },
+        expenses: { dieselTotal: 0, claimedRoadExpenses: 0, itemizedRoadExpenses: 0, reconciliationDiff: 0, roadTotalClaimed: 0, roadTotalItemized: 0, driverCommission: 0, fastagCharges: 0, addBlueCharges: 0, fixedTotal: 0 },
+        trips: [], dieselLogs: [], advances: [], roadExpenseItems: [], otherExpenses: []
+      };
+    }
+
+    persistState();
     return newTruck;
   }
 
-  function updateTruck(truckId, updatedData, projectId) {
-    const store = getStore();
-    const prj = projectId ? store.projects.find(p => p.id === projectId) : store.projects.find(p => p.id === getCurrentProjectId());
-    if (!prj) return false;
-    const idx = prj.trucks.findIndex(t => t.id === truckId);
+  function registerTruck(truck) {
+    return addTruck(truck);
+  }
+
+  function updateTruck(truckId, updatedData) {
+    const s = getStore();
+    const idx = s.trucks.findIndex(t => t.id === truckId);
     if (idx === -1) return false;
-
-    prj.trucks[idx] = Object.assign({}, prj.trucks[idx], updatedData);
-    saveStore(store);
+    s.trucks[idx] = { ...s.trucks[idx], ...updatedData };
+    persistState();
     return true;
   }
 
-  function deleteTruck(truckId, projectId) {
-    const store = getStore();
-    const prj = projectId ? store.projects.find(p => p.id === projectId) : store.projects.find(p => p.id === getCurrentProjectId());
-    if (!prj) return false;
-    prj.trucks = prj.trucks.filter(t => t.id !== truckId);
-    saveStore(store);
+  function deleteTruck(truckId) {
+    const s = getStore();
+    s.trucks = s.trucks.filter(t => t.id !== truckId);
+    delete s.pnlData[truckId];
+    persistState();
     return true;
   }
 
-  // --- Transactions CRUD (Trips, Diesel, Advances, Road Expenses) ---
-  function inferPeriod(dateStr) {
-    if (!dateStr) return getCurrentProject().activePeriod || "2026-10";
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      if (parts[0].length === 4) return parts[0] + '-' + parts[1]; // YYYY-MM-DD
-      if (parts[2].length === 4) return parts[2] + '-' + parts[1]; // DD-MM-YYYY
-    }
-    return getCurrentProject().activePeriod || "2026-10";
+  // --- Drivers ---
+  function getDrivers() {
+    return getStore().drivers || [];
   }
 
+  function getDriverById(driverId) {
+    return getDrivers().find(d => d.id === driverId);
+  }
+
+  function getDriverForTruck(truckId) {
+    return getDrivers().find(d => d.truckId === truckId);
+  }
+
+  // --- Periods ---
+  function getActivePeriod() {
+    return getStore().activePeriod || '2026-10';
+  }
+
+  function setActivePeriod(period) {
+    const s = getStore();
+    s.activePeriod = period;
+    persistState();
+  }
+
+  function getAccountingPeriods() {
+    const s = getStore();
+    return s.accountingPeriods || [];
+  }
+
+  // --- P&L Raw ---
+  function getPnLForTruck(truckId) {
+    const s = getStore();
+    return s.pnlData[truckId] || null;
+  }
+
+  // --- CRUD Trips ---
   function addTrip(truckId, trip) {
-    const store = getStore();
-    const prj = store.projects.find(p => p.id === getCurrentProjectId());
-    if (!prj) return false;
-    const truck = prj.trucks.find(t => t.id === truckId);
-    if (!truck) return false;
+    const s = getStore();
+    if (!s.pnlData[truckId]) return null;
 
-    if (!trip.id) trip.id = 'T-' + truckId.slice(-4) + '-' + String(Date.now()).slice(-4);
-    if (!trip.date) trip.date = new Date().toISOString().slice(0, 10);
-    if (!trip.period) trip.period = inferPeriod(trip.date);
-    trip.pnlFreight = Number(trip.pnlFreight) || 0;
-    trip.baseFreight = Number(trip.baseFreight) || trip.pnlFreight;
-    trip.advanceReceived = Number(trip.advanceReceived) || 0;
-    trip.balanceDue = trip.pnlFreight - trip.advanceReceived;
+    const newTrip = {
+      id: 'TRP-' + Date.now().toString().slice(-6),
+      date: trip.date || new Date().toISOString().split('T')[0],
+      transporter: trip.transporter || 'SR Logistics',
+      source: trip.source || 'Hyderabad',
+      destination: trip.destination || 'Vijayawada',
+      freightP1: Number(trip.freightP1) || 0,
+      baseFreight: Number(trip.baseFreight) || Number(trip.freightP1) || 0,
+      dieselAmount: Number(trip.dieselAmount) || 0,
+      roadExpenses: Number(trip.roadExpenses) || 0
+    };
 
-    truck.trips.push(trip);
-    saveStore(store);
-    return true;
+    s.pnlData[truckId].trips.push(newTrip);
+    recalculateTruckTotals(truckId);
+    persistState();
+    return newTrip;
   }
 
   function updateTrip(truckId, tripId, updatedTrip) {
-    const store = getStore();
-    const prj = store.projects.find(p => p.id === getCurrentProjectId());
-    if (!prj) return false;
-    const truck = prj.trucks.find(t => t.id === truckId);
-    if (!truck) return false;
-    const idx = truck.trips.findIndex(t => t.id === tripId);
+    const s = getStore();
+    if (!s.pnlData[truckId]) return false;
+    const idx = s.pnlData[truckId].trips.findIndex(t => t.id === tripId);
     if (idx === -1) return false;
 
-    updatedTrip.id = tripId;
-    if (!updatedTrip.period) updatedTrip.period = inferPeriod(updatedTrip.date);
-    updatedTrip.pnlFreight = Number(updatedTrip.pnlFreight) || 0;
-    updatedTrip.baseFreight = Number(updatedTrip.baseFreight) || updatedTrip.pnlFreight;
-    updatedTrip.advanceReceived = Number(updatedTrip.advanceReceived) || 0;
-    updatedTrip.balanceDue = updatedTrip.pnlFreight - updatedTrip.advanceReceived;
+    s.pnlData[truckId].trips[idx] = {
+      ...s.pnlData[truckId].trips[idx],
+      ...updatedTrip,
+      freightP1: Number(updatedTrip.freightP1) || 0,
+      baseFreight: Number(updatedTrip.baseFreight) || 0,
+      dieselAmount: Number(updatedTrip.dieselAmount) || 0,
+      roadExpenses: Number(updatedTrip.roadExpenses) || 0
+    };
 
-    truck.trips[idx] = updatedTrip;
-    saveStore(store);
+    recalculateTruckTotals(truckId);
+    persistState();
     return true;
   }
 
   function deleteTrip(truckId, tripId) {
-    const store = getStore();
-    const prj = store.projects.find(p => p.id === getCurrentProjectId());
-    if (!prj) return false;
-    const truck = prj.trucks.find(t => t.id === truckId);
-    if (!truck) return false;
-    truck.trips = truck.trips.filter(t => t.id !== tripId);
-    saveStore(store);
-    return true;
+    const s = getStore();
+    if (!s.pnlData[truckId]) return false;
+    const initialLen = s.pnlData[truckId].trips.length;
+    s.pnlData[truckId].trips = s.pnlData[truckId].trips.filter(t => t.id !== tripId);
+    if (s.pnlData[truckId].trips.length !== initialLen) {
+      recalculateTruckTotals(truckId);
+      persistState();
+      return true;
+    }
+    return false;
   }
 
+  // --- CRUD Diesel ---
   function addDiesel(truckId, diesel) {
-    const store = getStore();
-    const prj = store.projects.find(p => p.id === getCurrentProjectId());
-    if (!prj) return false;
-    const truck = prj.trucks.find(t => t.id === truckId);
-    if (!truck) return false;
+    const s = getStore();
+    if (!s.pnlData[truckId]) return null;
 
-    if (!diesel.id) diesel.id = 'D-' + truckId.slice(-4) + '-' + String(Date.now()).slice(-4);
-    if (!diesel.date) diesel.date = new Date().toISOString().slice(0, 10);
-    if (!diesel.period) diesel.period = inferPeriod(diesel.date);
-    diesel.amount = Number(diesel.amount) || 0;
+    const newLog = {
+      id: 'DSL-' + Date.now().toString().slice(-6),
+      date: diesel.date || new Date().toISOString().split('T')[0],
+      pump: diesel.pump || 'IndianOil Station',
+      liters: Number(diesel.liters) || 0,
+      rate: Number(diesel.rate) || 90,
+      amount: Number(diesel.amount) || ((Number(diesel.liters) || 0) * (Number(diesel.rate) || 90))
+    };
 
-    truck.diesel.push(diesel);
-    saveStore(store);
-    return true;
+    s.pnlData[truckId].dieselLogs.push(newLog);
+    recalculateTruckTotals(truckId);
+    persistState();
+    return newLog;
   }
 
-  function updateDiesel(truckId, dieselId, updatedDiesel) {
-    const store = getStore();
-    const prj = store.projects.find(p => p.id === getCurrentProjectId());
-    if (!prj) return false;
-    const truck = prj.trucks.find(t => t.id === truckId);
-    if (!truck) return false;
-    const idx = truck.diesel.findIndex(d => d.id === dieselId);
+  function updateDiesel(truckId, logId, updatedDiesel) {
+    const s = getStore();
+    if (!s.pnlData[truckId]) return false;
+    const idx = s.pnlData[truckId].dieselLogs.findIndex(d => d.id === logId);
     if (idx === -1) return false;
 
-    updatedDiesel.id = dieselId;
-    if (!updatedDiesel.period) updatedDiesel.period = inferPeriod(updatedDiesel.date);
-    updatedDiesel.amount = Number(updatedDiesel.amount) || 0;
+    s.pnlData[truckId].dieselLogs[idx] = {
+      ...s.pnlData[truckId].dieselLogs[idx],
+      ...updatedDiesel,
+      liters: Number(updatedDiesel.liters) || 0,
+      rate: Number(updatedDiesel.rate) || 0,
+      amount: Number(updatedDiesel.amount) || 0
+    };
 
-    truck.diesel[idx] = updatedDiesel;
-    saveStore(store);
+    recalculateTruckTotals(truckId);
+    persistState();
     return true;
   }
 
-  function deleteDiesel(truckId, dieselId) {
-    const store = getStore();
-    const prj = store.projects.find(p => p.id === getCurrentProjectId());
-    if (!prj) return false;
-    const truck = prj.trucks.find(t => t.id === truckId);
-    if (!truck) return false;
-    truck.diesel = truck.diesel.filter(d => d.id !== dieselId);
-    saveStore(store);
-    return true;
+  function deleteDiesel(truckId, logId) {
+    const s = getStore();
+    if (!s.pnlData[truckId]) return false;
+    const initialLen = s.pnlData[truckId].dieselLogs.length;
+    s.pnlData[truckId].dieselLogs = s.pnlData[truckId].dieselLogs.filter(d => d.id !== logId);
+    if (s.pnlData[truckId].dieselLogs.length !== initialLen) {
+      recalculateTruckTotals(truckId);
+      persistState();
+      return true;
+    }
+    return false;
   }
 
-  function addAdvance(truckId, adv) {
-    const store = getStore();
-    const prj = store.projects.find(p => p.id === getCurrentProjectId());
-    if (!prj) return false;
-    const truck = prj.trucks.find(t => t.id === truckId);
-    if (!truck) return false;
+  // --- CRUD Advances ---
+  function addAdvance(truckId, advance) {
+    const s = getStore();
+    if (!s.pnlData[truckId]) return null;
 
-    if (!adv.id) adv.id = 'ADV-' + truckId.slice(-4) + '-' + String(Date.now()).slice(-4);
-    if (!adv.date) adv.date = new Date().toISOString().slice(0, 10);
-    if (!adv.period) adv.period = inferPeriod(adv.date);
-    adv.amount = Number(adv.amount) || 0;
+    const newAdv = {
+      id: 'ADV-' + Date.now().toString().slice(-6),
+      date: advance.date || new Date().toISOString().split('T')[0],
+      type: advance.type || 'Cash',
+      purpose: advance.purpose || 'Trip Advance',
+      amount: Number(advance.amount) || 0
+    };
 
-    truck.driverAdvances.push(adv);
-    saveStore(store);
-    return true;
+    s.pnlData[truckId].advances.push(newAdv);
+    persistState();
+    return newAdv;
   }
 
   function updateAdvance(truckId, advId, updatedAdv) {
-    const store = getStore();
-    const prj = store.projects.find(p => p.id === getCurrentProjectId());
-    if (!prj) return false;
-    const truck = prj.trucks.find(t => t.id === truckId);
-    if (!truck) return false;
-    const idx = truck.driverAdvances.findIndex(a => a.id === advId);
+    const s = getStore();
+    if (!s.pnlData[truckId]) return false;
+    const idx = s.pnlData[truckId].advances.findIndex(a => a.id === advId);
     if (idx === -1) return false;
 
-    updatedAdv.id = advId;
-    if (!updatedAdv.period) updatedAdv.period = inferPeriod(updatedAdv.date);
-    updatedAdv.amount = Number(updatedAdv.amount) || 0;
+    s.pnlData[truckId].advances[idx] = {
+      ...s.pnlData[truckId].advances[idx],
+      ...updatedAdv,
+      amount: Number(updatedAdv.amount) || 0
+    };
 
-    truck.driverAdvances[idx] = updatedAdv;
-    saveStore(store);
+    persistState();
     return true;
   }
 
   function deleteAdvance(truckId, advId) {
-    const store = getStore();
-    const prj = store.projects.find(p => p.id === getCurrentProjectId());
-    if (!prj) return false;
-    const truck = prj.trucks.find(t => t.id === truckId);
-    if (!truck) return false;
-    truck.driverAdvances = truck.driverAdvances.filter(a => a.id !== advId);
-    saveStore(store);
-    return true;
+    const s = getStore();
+    if (!s.pnlData[truckId]) return false;
+    const initialLen = s.pnlData[truckId].advances.length;
+    s.pnlData[truckId].advances = s.pnlData[truckId].advances.filter(a => a.id !== advId);
+    if (s.pnlData[truckId].advances.length !== initialLen) {
+      persistState();
+      return true;
+    }
+    return false;
   }
 
+  // --- CRUD Road Expenses ---
   function addExpense(truckId, exp) {
-    const store = getStore();
-    const prj = store.projects.find(p => p.id === getCurrentProjectId());
-    if (!prj) return false;
-    const truck = prj.trucks.find(t => t.id === truckId);
-    if (!truck) return false;
+    const s = getStore();
+    if (!s.pnlData[truckId]) return null;
 
-    if (!exp.id) exp.id = 'EXP-' + truckId.slice(-4) + '-' + String(Date.now()).slice(-4);
-    if (!exp.date) exp.date = new Date().toISOString().slice(0, 10);
-    if (!exp.period) exp.period = inferPeriod(exp.date);
-    exp.amount = Number(exp.amount) || 0;
+    const newExp = {
+      id: 'RXP-' + Date.now().toString().slice(-6),
+      date: exp.date || new Date().toISOString().split('T')[0],
+      category: exp.category || 'Toll / RTO',
+      desc: exp.desc || '',
+      amount: Number(exp.amount) || 0
+    };
 
-    truck.roadExpenses.push(exp);
-    saveStore(store);
-    return true;
+    s.pnlData[truckId].roadExpenseItems.push(newExp);
+    recalculateTruckTotals(truckId);
+    persistState();
+    return newExp;
   }
 
   function updateExpense(truckId, expId, updatedExp) {
-    const store = getStore();
-    const prj = store.projects.find(p => p.id === getCurrentProjectId());
-    if (!prj) return false;
-    const truck = prj.trucks.find(t => t.id === truckId);
-    if (!truck) return false;
-    const idx = truck.roadExpenses.findIndex(e => e.id === expId);
+    const s = getStore();
+    if (!s.pnlData[truckId]) return false;
+    const idx = s.pnlData[truckId].roadExpenseItems.findIndex(e => e.id === expId);
     if (idx === -1) return false;
 
-    updatedExp.id = expId;
-    if (!updatedExp.period) updatedExp.period = inferPeriod(updatedExp.date);
-    updatedExp.amount = Number(updatedExp.amount) || 0;
+    s.pnlData[truckId].roadExpenseItems[idx] = {
+      ...s.pnlData[truckId].roadExpenseItems[idx],
+      ...updatedExp,
+      amount: Number(updatedExp.amount) || 0
+    };
 
-    truck.roadExpenses[idx] = updatedExp;
-    saveStore(store);
+    recalculateTruckTotals(truckId);
+    persistState();
     return true;
   }
 
   function deleteExpense(truckId, expId) {
-    const store = getStore();
-    const prj = store.projects.find(p => p.id === getCurrentProjectId());
-    if (!prj) return false;
-    const truck = prj.trucks.find(t => t.id === truckId);
-    if (!truck) return false;
-    truck.roadExpenses = truck.roadExpenses.filter(e => e.id !== expId);
-    saveStore(store);
-    return true;
-  }
-
-  function findRecord(truckId, type, id) {
-    const truck = getTruck(truckId);
-    if (!truck) return null;
-    if (type === 'trip') return truck.trips.find(t => t.id === id) || null;
-    if (type === 'diesel') return truck.diesel.find(d => d.id === id) || null;
-    if (type === 'advance') return truck.driverAdvances.find(a => a.id === id) || null;
-    if (type === 'expense') return truck.roadExpenses.find(e => e.id === id) || null;
-    return null;
-  }
-
-  // --- Reset to Master Verified Seed Data ---
-  function resetToOriginalSeed() {
-    const copy = JSON.parse(JSON.stringify(INITIAL_SEED));
-    saveStore(copy);
-    setCurrentProjectId("PRJ-001");
-    return copy;
-  }
-
-  // Backward compatibility wrapper for old code expecting getData()
-  function getData() {
-    const prj = getCurrentProject();
-    return {
-      metadata: {
-        systemTitle: prj.name,
-        version: "2.0.0",
-        activeFinancialPeriod: prj.activePeriod || "2026-10",
-        currencySymbol: "₹",
-        lastUpdated: getStore().lastUpdated
-      },
-      trucks: prj.trucks
-    };
-  }
-
-  function saveData(compatData) {
-    const store = getStore();
-    const prj = store.projects.find(p => p.id === getCurrentProjectId());
-    if (prj && compatData.trucks) {
-      prj.trucks = compatData.trucks;
+    const s = getStore();
+    if (!s.pnlData[truckId]) return false;
+    const initialLen = s.pnlData[truckId].roadExpenseItems.length;
+    s.pnlData[truckId].roadExpenseItems = s.pnlData[truckId].roadExpenseItems.filter(e => e.id !== expId);
+    if (s.pnlData[truckId].roadExpenseItems.length !== initialLen) {
+      recalculateTruckTotals(truckId);
+      persistState();
+      return true;
     }
-    saveStore(store);
+    return false;
   }
 
-  function getAccountingPeriods() {
-    const prj = getCurrentProject();
-    if (prj && Array.isArray(prj.accountingPeriods)) {
-      return prj.accountingPeriods;
-    }
-    return [
-      { id: "2026-10", name: "October 2026", status: "Active" },
-      { id: "2026-09", name: "September 2026", status: "Archived" },
-      { id: "2026-11", name: "November 2026", status: "Planned" }
-    ];
+  function recalculateTruckTotals(truckId) {
+    const s = getStore();
+    const pnl = s.pnlData[truckId];
+    if (!pnl) return;
+
+    let p1Total = 0;
+    let baseTotal = 0;
+    (pnl.trips || []).forEach(t => {
+      p1Total += (Number(t.freightP1) || 0);
+      baseTotal += (Number(t.baseFreight) || 0);
+    });
+
+    let dslTotal = 0;
+    (pnl.dieselLogs || []).forEach(d => {
+      dslTotal += (Number(d.amount) || 0);
+    });
+
+    let roadItemTotal = 0;
+    (pnl.roadExpenseItems || []).forEach(r => {
+      roadItemTotal += (Number(r.amount) || 0);
+    });
+
+    let tripRoadTotal = 0;
+    (pnl.trips || []).forEach(t => {
+      tripRoadTotal += (Number(t.roadExpenses) || 0);
+    });
+
+    pnl.revenue.p1Freight = p1Total;
+    pnl.revenue.baseFreight = baseTotal;
+    pnl.expenses.dieselTotal = dslTotal;
+    pnl.expenses.roadTotalItemized = roadItemTotal;
+    pnl.expenses.itemizedRoadExpenses = roadItemTotal;
+    pnl.expenses.roadTotalClaimed = tripRoadTotal;
+    pnl.expenses.claimedRoadExpenses = tripRoadTotal;
+    pnl.expenses.reconciliationDiff = roadItemTotal - tripRoadTotal;
+
+    const drv = getDriverForTruck(truckId);
+    const commRate = drv ? (drv.commissionRate || 0.12) : 0.12;
+    pnl.expenses.driverCommission = Math.round(baseTotal * commRate);
+  }
+
+  function mergeRemoteState(remoteState) {
+    if (!remoteState) return;
+    const s = getStore();
+    if (remoteState.trucks && remoteState.trucks.length > 0) s.trucks = remoteState.trucks;
+    if (remoteState.drivers && remoteState.drivers.length > 0) s.drivers = remoteState.drivers;
+    if (remoteState.pnlData) s.pnlData = remoteState.pnlData;
+    if (remoteState.activePeriod) s.activePeriod = remoteState.activePeriod;
+    s.lastUpdated = remoteState.lastUpdated || new Date().toISOString();
+    persistState();
+  }
+
+  function restoreOriginalData() {
+    store = JSON.parse(JSON.stringify(DEFAULT_INITIAL_STATE));
+    persistState();
   }
 
   return {
+    loadStateFromStorage,
     getStore,
     saveStore,
     getProjects,
-    getAccountingPeriods,
-    getCurrentProjectId,
+    getActiveProject,
     setCurrentProjectId,
-    getCurrentProject,
     addProject,
-    updateProject,
-    deleteProject,
     getTrucks,
-    getTruck,
+    getTruckById,
     addTruck,
+    registerTruck,
     updateTruck,
     deleteTruck,
+    getDrivers,
+    getDriverById,
+    getDriverForTruck,
+    getActivePeriod,
+    setActivePeriod,
+    getAccountingPeriods,
+    getPnLForTruck,
     addTrip,
     updateTrip,
     deleteTrip,
@@ -644,14 +646,7 @@ const DataModule = (function () {
     addExpense,
     updateExpense,
     deleteExpense,
-    findRecord,
-    resetToOriginalSeed,
-    getData,
-    saveData,
-    init: getStore
+    mergeRemoteState,
+    restoreOriginalData
   };
 })();
-
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = DataModule;
-}
