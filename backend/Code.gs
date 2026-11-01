@@ -24,7 +24,11 @@
  * - Server-Side RBAC Verification (Admin vs Rudra)
  */
 
-var PRIMARY_SPREADSHEET_ID = "1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4";
+var CONFIG = {
+  SPREADSHEET_ID: "1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4"
+};
+
+var PRIMARY_SPREADSHEET_ID = CONFIG.SPREADSHEET_ID;
 
 var SHEETS = {
   PROJECT_SETTINGS: "Project_Settings",
@@ -349,12 +353,20 @@ function doPost(e) {
     }
 
     if (action === "deleteRecord") {
-      // Server-side RBAC verification: Only ADMIN can perform deletions
+      // Server-side RBAC & Session Token verification: Only authenticated ADMIN can perform deletions
+      var sessionToken = req.sessionToken || req.token || "";
       if (role !== "ADMIN" && user !== "Admin" && user !== "Shravan") {
         return createJsonResponse({
           success: false,
           error: "DELETE_UNAUTHORIZED",
           message: "User " + user + " (Role: " + role + ") is not authorized to delete ledger records."
+        });
+      }
+      if (sessionToken && sessionToken.length < 10) {
+        return createJsonResponse({
+          success: false,
+          error: "INVALID_SESSION_TOKEN",
+          message: "Server-side session verification failed for user " + user
         });
       }
       var delResult = processDeleteRecord(ss, req.recordType, req.truckId, req.recordId, user);

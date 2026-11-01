@@ -6,11 +6,18 @@
 const ApiModule = (function () {
   'use strict';
 
+  const CONFIG = {
+    SPREADSHEET_ID: '1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4',
+    GAS_URL: 'https://script.google.com/macros/s/AKfycbwREdyxaW64mixcHfFNyspj_KD_jxYYryQWjRukjPiBxdjkNoG0tguD0vaPW0n0cMcinQ/exec',
+    DEPLOYMENT_ID: 'AKfycbwREdyxaW64mixcHfFNyspj_KD_jxYYryQWjRukjPiBxdjkNoG0tguD0vaPW0n0cMcinQ',
+    SCRIPT_PROJECT_URL: 'https://script.google.com/u/0/home/projects/1l4GkXJ-eiX-SzyeGlfBMWc-H32sE2ubeNnq_LDEDXqMtYhU6b4Zls8bL/edit'
+  };
+
   const GAS_URL_KEY = 'FLEET_LEDGER_P2_GAS_ENDPOINT';
   const DATA_VERSION_KEY = 'FLEET_LEDGER_P2_DATA_VERSION';
-  const DEFAULT_SPREADSHEET_ID = '1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4';
-  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwREdyxaW64mixcHfFNyspj_KD_jxYYryQWjRukjPiBxdjkNoG0tguD0vaPW0n0cMcinQ/exec';
-  const SCRIPT_PROJECT_URL = 'https://script.google.com/u/0/home/projects/1l4GkXJ-eiX-SzyeGlfBMWc-H32sE2ubeNnq_LDEDXqMtYhU6b4Zls8bL/edit';
+  const DEFAULT_SPREADSHEET_ID = CONFIG.SPREADSHEET_ID;
+  const DEFAULT_GAS_URL = CONFIG.GAS_URL;
+  const SCRIPT_PROJECT_URL = CONFIG.SCRIPT_PROJECT_URL;
 
   let currentSyncStatus = 'ONLINE_READY'; // 'SYNCING', 'SYNCED', 'OFFLINE', 'FAILED', 'CONFLICT'
   let syncTimer = null;
@@ -86,17 +93,21 @@ const ApiModule = (function () {
     }
   }
 
+  function getConfig() {
+    return Object.assign({}, CONFIG);
+  }
+
+  function getSpreadsheetUrl() {
+    const sheetId = getProjectSpreadsheetId();
+    return 'https://docs.google.com/spreadsheets/d/' + sheetId + '/edit?usp=sharing';
+  }
+
   function openGoogleSheet() {
     if (typeof AuthModule !== 'undefined' && typeof AuthModule.isAdmin === 'function' && !AuthModule.isAdmin()) {
       alert("Access Denied: Only Administrator (Admin) can access the raw Google Spreadsheet.");
       return;
     }
-    const sheetId = getProjectSpreadsheetId();
-    if (sheetId && sheetId !== "" && !sheetId.includes("placeholder")) {
-      window.open('https://docs.google.com/spreadsheets/d/' + sheetId + '/edit', '_blank');
-    } else {
-      window.open('https://docs.google.com/spreadsheets/d/' + DEFAULT_SPREADSHEET_ID + '/edit?usp=sharing', '_blank');
-    }
+    window.open(getSpreadsheetUrl(), '_blank');
   }
 
   function openScriptProject() {
@@ -241,6 +252,8 @@ const ApiModule = (function () {
     setProjectSpreadsheetId,
     openGoogleSheet,
     openScriptProject,
+    getConfig,
+    getSpreadsheetUrl,
     getScriptProjectUrl: function () { return SCRIPT_PROJECT_URL; },
     getDataVersion,
     incrementDataVersion,

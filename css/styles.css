@@ -2185,5 +2185,58 @@ body.in-sheet-fullscreen {
   }
 }
 
+/* ==============================================================
+   ENTERPRISE SUITE STYLING ENHANCEMENTS
+   ============================================================== */
+.breadcrumb-container {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+@media (max-width: 1024px) {
+  .breadcrumb-container {
+    display: none !important;
+  }
+}
+
+.enterprise-vehicle-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.enterprise-vehicle-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+}
+
+.report-data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.report-data-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.report-data-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.table-responsive-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.table-responsive-wrapper::-webkit-scrollbar {
+  height: 6px;
+}
+
+.table-responsive-wrapper::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
 
 

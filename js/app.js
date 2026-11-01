@@ -29,6 +29,7 @@ const AppModule = (function () {
   function init() {
     checkAuthSession();
     renderProjectSelector();
+    renderPeriodSelector();
     renderTruckFilterPills();
     renderCurrentView();
     setupEventListeners();
@@ -79,12 +80,34 @@ const AppModule = (function () {
     `).join('');
   }
 
+  function renderPeriodSelector() {
+    const periodSelect = document.getElementById('filterPeriodSelect');
+    if (!periodSelect) return;
+
+    const periods = (typeof DataModule !== 'undefined' && DataModule.getAccountingPeriods)
+      ? DataModule.getAccountingPeriods()
+      : [
+          { id: '2026-10', name: 'October 2026', status: 'Active' },
+          { id: '2026-09', name: 'September 2026', status: 'Archived' },
+          { id: '2026-11', name: 'November 2026', status: 'Planned' }
+        ];
+
+    let html = periods.map(p => `
+      <option value="${p.id}" ${p.id === currentPeriodFilter ? 'selected' : ''}>
+        ${ApiModule.escapeHtml(p.name)} (${p.status})
+      </option>
+    `).join('');
+    html += `<option value="ALL" ${currentPeriodFilter === 'ALL' ? 'selected' : ''}>All Financial Periods</option>`;
+    periodSelect.innerHTML = html;
+  }
+
   function selectProject(projectId) {
     DataModule.setCurrentProjectId(projectId);
     currentTruckFilter = 'ALL';
     const curPrj = DataModule.getCurrentProject();
     currentPeriodFilter = curPrj.activePeriod || '2026-10';
     renderProjectSelector();
+    renderPeriodSelector();
     renderTruckFilterPills();
     renderCurrentView();
     showToast(`Switched to project: ${curPrj.name}`, 'info');
@@ -185,18 +208,71 @@ const AppModule = (function () {
     renderCurrentView();
   }
 
+  const VIEW_MAP = {
+    overview: 'dashboard',
+    dashboard: 'dashboard',
+    fleet: 'fleet',
+    trips: 'trips',
+    financials: 'pnl',
+    pnl: 'pnl',
+    expenses: 'expenses',
+    settlements: 'driver',
+    driver: 'driver',
+    reports: 'reports',
+    excel: 'excel'
+  };
+
+  const VIEW_TITLES = {
+    dashboard: 'Overview • Fleet Command Center',
+    fleet: 'Fleet • Commercial Vehicle Management',
+    trips: 'Trips • Freight Shipments & Routes',
+    pnl: 'Financials • Profit & Loss Accounts',
+    expenses: 'Expenses • Fuel, Tolls & Road Receipts',
+    driver: 'Settlements • Driver Accounts & Liabilities',
+    reports: 'Reports • Analytics & Excel Exports',
+    excel: 'Spreadsheet • 1:1 Live Excel Replica'
+  };
+
   // --- View Switching ---
   function switchView(viewName) {
-    currentView = viewName;
-    ['dashboard', 'pnl', 'driver', 'excel'].forEach(v => {
+    if (viewName === 'settings') {
+      openSettingsModal();
+      closeSidebar();
+      return;
+    }
+
+    const targetView = VIEW_MAP[viewName] || 'dashboard';
+    currentView = targetView;
+
+    const allViews = ['dashboard', 'fleet', 'trips', 'pnl', 'expenses', 'driver', 'reports', 'excel'];
+    allViews.forEach(v => {
       const el = document.getElementById('view-' + v);
-      const btn = document.getElementById('btnNav' + v.charAt(0).toUpperCase() + v.slice(1));
-      if (el) el.style.display = (v === viewName) ? 'block' : 'none';
-      if (btn) {
-        if (v === viewName) btn.classList.add('active');
-        else btn.classList.remove('active');
+      if (el) el.style.display = (v === targetView) ? 'block' : 'none';
+    });
+
+    // Update nav links across header and sidebar
+    document.querySelectorAll('[data-view-target]').forEach(btn => {
+      const target = btn.getAttribute('data-view-target');
+      if (target === targetView || VIEW_MAP[target] === targetView) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
       }
     });
+
+    // Legacy nav buttons support for backward compatibility
+    ['Dashboard', 'Pnl', 'Driver', 'Excel'].forEach(legacy => {
+      const btn = document.getElementById('btnNav' + legacy);
+      const drawerBtn = document.getElementById('drawerNav' + legacy);
+      const isMatch = (VIEW_MAP[legacy.toLowerCase()] === targetView);
+      if (btn) btn.classList.toggle('active', isMatch);
+      if (drawerBtn) drawerBtn.classList.toggle('active', isMatch);
+    });
+
+    const breadcrumb = document.getElementById('headerBreadcrumbView');
+    if (breadcrumb) {
+      breadcrumb.textContent = VIEW_TITLES[targetView] || targetView.toUpperCase();
+    }
 
     renderCurrentView();
     closeSidebar();
@@ -213,10 +289,18 @@ const AppModule = (function () {
 
     if (currentView === 'dashboard') {
       DashboardModule.render(filterOptions);
+    } else if (currentView === 'fleet') {
+      TableModule.renderFleetView(filterOptions);
+    } else if (currentView === 'trips') {
+      TableModule.renderTripsView(currentTruckFilter, filterOptions);
     } else if (currentView === 'pnl') {
       TableModule.renderPnlView(currentTruckFilter, filterOptions);
+    } else if (currentView === 'expenses') {
+      TableModule.renderExpensesView(currentTruckFilter, filterOptions);
     } else if (currentView === 'driver') {
       TableModule.renderDriverView(currentTruckFilter, filterOptions);
+    } else if (currentView === 'reports') {
+      TableModule.renderReportsView(filterOptions);
     } else if (currentView === 'excel') {
       TableModule.renderExcelReplica();
     }
@@ -447,16 +531,40 @@ const AppModule = (function () {
     const modal = document.getElementById('settingsModal');
     const endpointInput = document.getElementById('settingGasEndpoint');
     const sheetIdInput = document.getElementById('settingSheetUrl');
-    const projectUrlEl = document.getElementById('settingProjectUrlDisplay');
+    const cfg = ApiModule.getConfig ? ApiModule.getConfig() : {};
 
     if (endpointInput) endpointInput.value = ApiModule.getEndpoint();
     if (sheetIdInput) {
-      const currentId = ApiModule.getProjectSpreadsheetId();
-      sheetIdInput.value = currentId ? `https://docs.google.com/spreadsheets/d/${currentId}/edit?usp=sharing` : '';
+      sheetIdInput.value = (typeof ApiModule.getSpreadsheetUrl === 'function')
+        ? ApiModule.getSpreadsheetUrl()
+        : ('https://docs.google.com/spreadsheets/d/' + ApiModule.getProjectSpreadsheetId() + '/edit?usp=sharing');
     }
-    if (projectUrlEl && typeof ApiModule.getScriptProjectUrl === 'function') {
-      projectUrlEl.textContent = ApiModule.getScriptProjectUrl();
+
+    const quickSheet = document.getElementById('settingQuickSheetLink');
+    if (quickSheet && typeof ApiModule.getSpreadsheetUrl === 'function') {
+      quickSheet.href = ApiModule.getSpreadsheetUrl();
     }
+
+    const quickProject = document.getElementById('settingQuickProjectLink');
+    if (quickProject && cfg.SCRIPT_PROJECT_URL) {
+      quickProject.href = cfg.SCRIPT_PROJECT_URL;
+    }
+
+    const quickEndpoint = document.getElementById('settingQuickEndpointLink');
+    if (quickEndpoint) {
+      quickEndpoint.href = ApiModule.getEndpoint();
+    }
+
+    const deploymentIdEl = document.getElementById('settingDeploymentIdDisplay');
+    if (deploymentIdEl && cfg.DEPLOYMENT_ID) {
+      deploymentIdEl.textContent = cfg.DEPLOYMENT_ID;
+    }
+
+    const sheetIdEl = document.getElementById('settingSheetIdDisplay');
+    if (sheetIdEl) {
+      sheetIdEl.textContent = ApiModule.getProjectSpreadsheetId();
+    }
+
     if (modal) modal.style.display = 'flex';
   }
 
@@ -616,6 +724,68 @@ const AppModule = (function () {
     window.addEventListener('keydown', e => {
       if (e.key === 'Escape') closeModal();
     });
+
+    // Form Event Listeners (moved from inline handlers)
+    const authForm = document.getElementById('authLoginForm');
+    if (authForm && typeof AuthModule !== 'undefined' && AuthModule.handleLogin) {
+      authForm.addEventListener('submit', AuthModule.handleLogin);
+    }
+
+    const addForm = document.getElementById('addEntryForm');
+    if (addForm) {
+      addForm.addEventListener('submit', saveModalEntry);
+    }
+
+    const setForm = document.getElementById('settingsForm');
+    if (setForm) {
+      setForm.addEventListener('submit', saveSettings);
+    }
+
+    const pwdForm = document.getElementById('changePasswordForm');
+    if (pwdForm) {
+      pwdForm.addEventListener('submit', savePasswordChange);
+    }
+
+    const entryTypeSelect = document.getElementById('modalEntryType');
+    if (entryTypeSelect) {
+      entryTypeSelect.addEventListener('change', function () {
+        toggleModalFields(this.value);
+      });
+    }
+
+    const periodSelect = document.getElementById('filterPeriodSelect');
+    if (periodSelect) {
+      periodSelect.addEventListener('change', function () {
+        selectPeriodFilter(this.value);
+      });
+    }
+
+    const searchInput = document.getElementById('filterSearchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', function () {
+        applySearch(this.value);
+      });
+    }
+
+    const sidebarBtn = document.getElementById('btnOpenSidebar');
+    if (sidebarBtn) {
+      sidebarBtn.addEventListener('click', toggleSidebar);
+    }
+
+    const drawerCloseBtn = document.querySelector('.drawer-close-btn');
+    if (drawerCloseBtn) {
+      drawerCloseBtn.addEventListener('click', closeSidebar);
+    }
+
+    const drawerBackdrop = document.getElementById('drawerBackdrop');
+    if (drawerBackdrop) {
+      drawerBackdrop.addEventListener('click', closeSidebar);
+    }
+
+    // Refresh Lucide icons if available
+    if (typeof lucide !== 'undefined' && lucide.createIcons) {
+      setTimeout(() => lucide.createIcons(), 30);
+    }
   }
 
   return {

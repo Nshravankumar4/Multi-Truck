@@ -604,10 +604,23 @@ const DataModule = (function () {
     saveStore(store);
   }
 
+  function getAccountingPeriods() {
+    const prj = getCurrentProject();
+    if (prj && Array.isArray(prj.accountingPeriods)) {
+      return prj.accountingPeriods;
+    }
+    return [
+      { id: "2026-10", name: "October 2026", status: "Active" },
+      { id: "2026-09", name: "September 2026", status: "Archived" },
+      { id: "2026-11", name: "November 2026", status: "Planned" }
+    ];
+  }
+
   return {
     getStore,
     saveStore,
     getProjects,
+    getAccountingPeriods,
     getCurrentProjectId,
     setCurrentProjectId,
     getCurrentProject,

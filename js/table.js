@@ -19,6 +19,12 @@ const TableModule = (function () {
   let expenseFilterCategory = 'all';
   let isFullscreen = false;
 
+  function refreshIcons() {
+    if (typeof lucide !== 'undefined' && lucide.createIcons) {
+      setTimeout(() => lucide.createIcons(), 20);
+    }
+  }
+
   function setZoom(level) {
     currentZoom = level;
     const grid = document.getElementById('excelReplicaGrid');
@@ -298,6 +304,7 @@ const TableModule = (function () {
     });
 
     container.innerHTML = html;
+    refreshIcons();
   }
 
   /**
@@ -592,6 +599,7 @@ const TableModule = (function () {
     });
 
     container.innerHTML = html;
+    refreshIcons();
   }
 
   /**
@@ -669,6 +677,7 @@ const TableModule = (function () {
     `;
 
     container.innerHTML = html;
+    refreshIcons();
   }
 
   function renderPnlReplicaSheet(t6666, t1122, pnl6666, pnl1122) {
@@ -823,6 +832,7 @@ const TableModule = (function () {
         </div>
       </div>
     `;
+    refreshIcons();
   }
 
   function renderSeptReplicaSheet(truck, label) {
@@ -941,6 +951,556 @@ const TableModule = (function () {
     }
   }
 
+  /**
+   * -------------------------------------------------------------
+   * NEW ENTERPRISE SUITE SCREENS: Fleet, Trips, Expenses, Reports
+   * -------------------------------------------------------------
+   */
+
+  /**
+   * 1. Fleet / Vehicle Management View
+   */
+  function renderFleetView(filterOptions) {
+    const container = document.getElementById('view-fleet');
+    if (!container) return;
+
+    const currentProject = DataModule.getCurrentProject();
+    const trucks = DataModule.getTrucks();
+    const periodDisplay = (filterOptions && filterOptions.period && filterOptions.period !== 'ALL')
+      ? filterOptions.period
+      : (currentProject.activePeriod || '2026-10');
+
+    let vehicleCardsHtml = '';
+    let totalFleetRev = 0;
+    let totalFleetExp = 0;
+    let totalFleetNet = 0;
+    let totalFleetTrips = 0;
+
+    trucks.forEach(t => {
+      const pnl = CalcModule.calculateTruckPnL(t, filterOptions);
+      const set = CalcModule.calculateDriverSettlement(t, filterOptions);
+
+      totalFleetRev += pnl.totalRevenueP1;
+      totalFleetExp += pnl.totalExpensesP2;
+      totalFleetNet += pnl.netProfit;
+      totalFleetTrips += pnl.filteredTrips.length;
+
+      const isPayable = set.netDirection === 'PAYABLE_TO_DRIVER';
+
+      vehicleCardsHtml += `
+        <div class="enterprise-vehicle-card" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span style="font-size: 1.25rem; font-weight: 700; color: #1e3a8a; letter-spacing: 0.5px;">${ApiModule.escapeHtml(t.regNumber || t.id)}</span>
+                  <span style="background: #ecfdf5; color: #047857; font-size: 0.72rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px; border: 1px solid #a7f3d0;">Active</span>
+                </div>
+                <div style="font-size: 0.85rem; color: #475569; margin-top: 0.2rem;">
+                  Driver: <strong style="color: #0f172a;">${ApiModule.escapeHtml(t.driverName)}</strong>
+                  ${t.driverPhone ? `<span style="color: #64748b; font-size: 0.78rem;"> • ${ApiModule.escapeHtml(t.driverPhone)}</span>` : ''}
+                </div>
+              </div>
+              <span style="font-size: 0.85rem; font-weight: 700; color: ${pnl.isProfitable ? '#15803d' : '#b91c1c'}; background: ${pnl.isProfitable ? '#f0fdf4' : '#fef2f2'}; padding: 0.25rem 0.6rem; border-radius: 6px;">
+                ${pnl.profitMargin}% Margin
+              </span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; padding: 0.85rem 0; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; font-size: 0.82rem;">
+              <div>
+                <span style="color: #64748b; display: block; font-size: 0.72rem; text-transform: uppercase;">Freight Revenue (P1)</span>
+                <strong style="color: #15803d; font-size: 0.95rem;">${CalcModule.formatCurrency(pnl.totalRevenueP1)}</strong>
+              </div>
+              <div>
+                <span style="color: #64748b; display: block; font-size: 0.72rem; text-transform: uppercase;">Operating Costs (P2)</span>
+                <strong style="color: #b91c1c; font-size: 0.95rem;">${CalcModule.formatCurrency(pnl.totalExpensesP2)}</strong>
+              </div>
+              <div>
+                <span style="color: #64748b; display: block; font-size: 0.72rem; text-transform: uppercase;">Net Operating Profit</span>
+                <strong style="color: #1e3a8a; font-size: 0.95rem;">${CalcModule.formatCurrency(pnl.netProfit)}</strong>
+              </div>
+              <div>
+                <span style="color: #64748b; display: block; font-size: 0.72rem; text-transform: uppercase;">Trips Completed</span>
+                <strong style="color: #334155; font-size: 0.95rem;">${pnl.filteredTrips.length} Shipments</strong>
+              </div>
+            </div>
+
+            <div style="margin-top: 0.75rem; padding: 0.6rem; background: ${isPayable ? '#eff6ff' : '#fefce8'}; border: 1px solid ${isPayable ? '#bfdbfe' : '#fef08a'}; border-radius: 8px; font-size: 0.78rem;">
+              <span style="color: #475569;">Driver Account Balance:</span>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.2rem;">
+                <strong style="color: ${isPayable ? '#1e40af' : '#854d0e'}; font-size: 0.9rem;">${CalcModule.formatCurrency(set.netBalance)}</strong>
+                <span style="font-weight: 600; font-size: 0.75rem; color: ${isPayable ? '#1d4ed8' : '#a16207'};">
+                  ${isPayable ? 'Payable to Driver' : 'Payable by Driver'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.4rem; margin-top: 1rem; flex-wrap: wrap;">
+            <button class="btn btn-xs btn-primary" onclick="AppModule.switchView('trips'); AppModule.selectTruckFilter('${t.id}');" style="flex: 1;">
+              📦 Trips
+            </button>
+            <button class="btn btn-xs btn-secondary" onclick="AppModule.switchView('pnl'); AppModule.selectTruckFilter('${t.id}');" style="flex: 1;">
+              💼 P&amp;L
+            </button>
+            <button class="btn btn-xs btn-secondary" onclick="AppModule.switchView('driver'); AppModule.selectTruckFilter('${t.id}');" style="flex: 1;">
+              👤 Settlement
+            </button>
+            <button class="btn btn-xs btn-outline admin-only" onclick="AppModule.confirmDelete('truck', '${t.id}')" title="Delete Truck">
+              🗑️
+            </button>
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+        <div>
+          <h2 style="font-size: 1.4rem; font-weight: 700; color: #0f172a; margin: 0;">🚛 Commercial Vehicle Fleet Management</h2>
+          <p style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">
+            Real-time fleet performance, operational tracking, and vehicle profitability for <strong>${ApiModule.escapeHtml(currentProject.name)}</strong> (${periodDisplay}).
+          </p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <button class="btn btn-secondary" onclick="TableModule.exportToExcel()" title="Export Fleet to Excel">
+            📥 Export Excel (.xlsx)
+          </button>
+          <button class="btn btn-primary admin-only" onclick="AppModule.openAddTruckModal()" title="Register New Vehicle">
+            ＋ Register New Vehicle
+          </button>
+        </div>
+      </div>
+
+      <!-- Fleet Overview Cards Grid -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+        ${vehicleCardsHtml}
+      </div>
+
+      <!-- Fleet Detailed Table -->
+      <div class="excel-card-wrapper" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <div style="padding: 1rem 1.25rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="font-size: 0.95rem; font-weight: 700; color: #1e293b; margin: 0;">Vehicle Performance &amp; Financial Summary</h3>
+          <span style="font-size: 0.8rem; color: #64748b;">${trucks.length} Registered Commercial Trucks</span>
+        </div>
+        <div class="table-responsive-wrapper" style="overflow-x: auto;">
+          <table class="report-data-table" style="width: 100%; border-collapse: collapse; font-size: 0.84rem;">
+            <thead>
+              <tr style="background: #1e3a8a; color: #ffffff;">
+                <th style="padding: 0.65rem 0.85rem; text-align: left;">Vehicle Number</th>
+                <th style="padding: 0.65rem 0.85rem; text-align: left;">Assigned Driver</th>
+                <th style="padding: 0.65rem 0.85rem; text-align: center;">Trips</th>
+                <th style="padding: 0.65rem 0.85rem; text-align: right;">Freight Revenue ($P_1$)</th>
+                <th style="padding: 0.65rem 0.85rem; text-align: right;">Operating Costs ($P_2$)</th>
+                <th style="padding: 0.65rem 0.85rem; text-align: right;">Net Profit ($P_1 - P_2$)</th>
+                <th style="padding: 0.65rem 0.85rem; text-align: right;">Margin %</th>
+                <th style="padding: 0.65rem 0.85rem; text-align: right;">Driver Settlement</th>
+                <th style="padding: 0.65rem 0.85rem; text-align: center;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${trucks.map(t => {
+                const p = CalcModule.calculateTruckPnL(t, filterOptions);
+                const s = CalcModule.calculateDriverSettlement(t, filterOptions);
+                const isPay = s.netDirection === 'PAYABLE_TO_DRIVER';
+                return `
+                  <tr style="border-bottom: 1px solid #f1f5f9;">
+                    <td style="padding: 0.65rem 0.85rem; font-weight: 700; color: #1e3a8a;">${ApiModule.escapeHtml(t.regNumber || t.id)}</td>
+                    <td style="padding: 0.65rem 0.85rem;">${ApiModule.escapeHtml(t.driverName)}</td>
+                    <td style="padding: 0.65rem 0.85rem; text-align: center;">${p.filteredTrips.length}</td>
+                    <td style="padding: 0.65rem 0.85rem; text-align: right; color: #15803d; font-weight: 600;">${CalcModule.formatCurrency(p.totalRevenueP1)}</td>
+                    <td style="padding: 0.65rem 0.85rem; text-align: right; color: #b91c1c; font-weight: 600;">${CalcModule.formatCurrency(p.totalExpensesP2)}</td>
+                    <td style="padding: 0.65rem 0.85rem; text-align: right; color: #1e3a8a; font-weight: 700;">${CalcModule.formatCurrency(p.netProfit)}</td>
+                    <td style="padding: 0.65rem 0.85rem; text-align: right; font-weight: 600;">${p.profitMargin}%</td>
+                    <td style="padding: 0.65rem 0.85rem; text-align: right; color: ${isPay ? '#15803d' : '#b91c1c'}; font-weight: 600;">
+                      ${CalcModule.formatCurrency(s.netBalance)} (${isPay ? 'Payable' : 'Receivable'})
+                    </td>
+                    <td style="padding: 0.65rem 0.85rem; text-align: center;">
+                      <button class="btn btn-xs btn-outline" onclick="AppModule.switchView('pnl'); AppModule.selectTruckFilter('${t.id}');" title="View P&L">📊</button>
+                      <button class="btn btn-xs btn-outline" onclick="AppModule.switchView('driver'); AppModule.selectTruckFilter('${t.id}');" title="View Driver">👤</button>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="background: #f8fafc; font-weight: 700; border-top: 2px solid #cbd5e1;">
+                <td style="padding: 0.75rem 0.85rem;" colspan="2">FLEET TOTALS (${trucks.length} Trucks)</td>
+                <td style="padding: 0.75rem 0.85rem; text-align: center;">${totalFleetTrips}</td>
+                <td style="padding: 0.75rem 0.85rem; text-align: right; color: #15803d;">${CalcModule.formatCurrency(totalFleetRev)}</td>
+                <td style="padding: 0.75rem 0.85rem; text-align: right; color: #b91c1c;">${CalcModule.formatCurrency(totalFleetExp)}</td>
+                <td style="padding: 0.75rem 0.85rem; text-align: right; color: #1e3a8a;">${CalcModule.formatCurrency(totalFleetNet)}</td>
+                <td style="padding: 0.75rem 0.85rem; text-align: right;">${totalFleetRev > 0 ? ((totalFleetNet / totalFleetRev) * 100).toFixed(2) : 0}%</td>
+                <td style="padding: 0.75rem 0.85rem; text-align: right;">-</td>
+                <td style="padding: 0.75rem 0.85rem; text-align: center;">-</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    `;
+    refreshIcons();
+  }
+
+  /**
+   * 2. Trips / Shipments Management View
+   */
+  function renderTripsView(truckFilter, filterOptions) {
+    const container = document.getElementById('view-trips');
+    if (!container) return;
+
+    const currentProject = DataModule.getCurrentProject();
+    let trucks = DataModule.getTrucks();
+
+    if (truckFilter && truckFilter !== 'ALL') {
+      trucks = trucks.filter(t => t.id === truckFilter);
+    }
+
+    let allTrips = [];
+    trucks.forEach(t => {
+      (t.trips || []).forEach(tr => {
+        if (CalcModule.matchesFilter(tr, filterOptions)) {
+          allTrips.push({ ...tr, truckReg: t.regNumber || t.id, driverName: t.driverName, truckId: t.id });
+        }
+      });
+    });
+
+    const totalFreight = allTrips.reduce((s, tr) => s + (Number(tr.pnlFreight) || 0), 0);
+    const totalBaseFreight = allTrips.reduce((s, tr) => s + (Number(tr.baseFreight) || 0), 0);
+    const totalAdvance = allTrips.reduce((s, tr) => s + (Number(tr.advanceReceived) || 0), 0);
+    const totalBalance = allTrips.reduce((s, tr) => s + (Number(tr.balanceDue) || 0), 0);
+
+    container.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+        <div>
+          <h2 style="font-size: 1.4rem; font-weight: 700; color: #0f172a; margin: 0;">📦 Freight Shipment Trips Ledger</h2>
+          <p style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">
+            Detailed shipment records, route logistics, freight revenues ($P_1$), and payment statuses.
+          </p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <button class="btn btn-secondary" onclick="TableModule.exportToExcel()" title="Export Trips to Excel">
+            📥 Export Excel (.xlsx)
+          </button>
+          <button class="btn btn-primary" onclick="AppModule.openAddModal('trip')" title="Add New Shipment">
+            ＋ Add Shipment
+          </button>
+        </div>
+      </div>
+
+      <!-- Trips Metric Highlights -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.85rem; margin-bottom: 1.25rem;">
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1rem;">
+          <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Total Shipments</span>
+          <div style="font-size: 1.3rem; font-weight: 700; color: #0f172a; margin-top: 0.2rem;">${allTrips.length} Verified Trips</div>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1rem;">
+          <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Total P&amp;L Freight ($P_1$)</span>
+          <div style="font-size: 1.3rem; font-weight: 700; color: #15803d; margin-top: 0.2rem;">${CalcModule.formatCurrency(totalFreight)}</div>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1rem;">
+          <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Advance Received</span>
+          <div style="font-size: 1.3rem; font-weight: 700; color: #1e40af; margin-top: 0.2rem;">${CalcModule.formatCurrency(totalAdvance)}</div>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1rem;">
+          <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Balance Outstanding</span>
+          <div style="font-size: 1.3rem; font-weight: 700; color: #b91c1c; margin-top: 0.2rem;">${CalcModule.formatCurrency(totalBalance)}</div>
+        </div>
+      </div>
+
+      <!-- Trips Table Card -->
+      <div class="excel-card-wrapper" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <div class="table-responsive-wrapper" style="overflow-x: auto;">
+          <table class="report-data-table" style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+            <thead>
+              <tr style="background: #1e3a8a; color: #ffffff;">
+                <th style="padding: 0.65rem; text-align: left;">Trip ID</th>
+                <th style="padding: 0.65rem; text-align: left;">Vehicle</th>
+                <th style="padding: 0.65rem; text-align: left;">Dates</th>
+                <th style="padding: 0.65rem; text-align: left;">Route (From → To)</th>
+                <th style="padding: 0.65rem; text-align: left;">Transporter</th>
+                <th style="padding: 0.65rem; text-align: right;">Total Freight ($P_1$)</th>
+                <th style="padding: 0.65rem; text-align: right;">Base Freight (12%)</th>
+                <th style="padding: 0.65rem; text-align: right;">Advance Recd</th>
+                <th style="padding: 0.65rem; text-align: right;">Balance Due</th>
+                <th style="padding: 0.65rem; text-align: center;">POD Status</th>
+                <th style="padding: 0.65rem; text-align: center;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${allTrips.length === 0 ? `
+                <tr><td colspan="11" style="text-align: center; padding: 2rem; color: #64748b;">No shipment trips match current filters.</td></tr>
+              ` : allTrips.map(tr => `
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 0.6rem; font-family: monospace; font-weight: 700; color: #1e3a8a;">${ApiModule.escapeHtml(tr.id)}</td>
+                  <td style="padding: 0.6rem; font-weight: 600;">${ApiModule.escapeHtml(tr.truckReg)}</td>
+                  <td style="padding: 0.6rem;">${ApiModule.escapeHtml(tr.dates || '-')}</td>
+                  <td style="padding: 0.6rem; font-weight: 600; color: #0f172a;">${ApiModule.escapeHtml(tr.from)} → ${ApiModule.escapeHtml(tr.to)}</td>
+                  <td style="padding: 0.6rem;">${ApiModule.escapeHtml(tr.transporter || '-')}</td>
+                  <td style="padding: 0.6rem; text-align: right; color: #15803d; font-weight: 700;">${CalcModule.formatCurrency(tr.pnlFreight)}</td>
+                  <td style="padding: 0.6rem; text-align: right; color: #475569;">${CalcModule.formatCurrency(tr.baseFreight)}</td>
+                  <td style="padding: 0.6rem; text-align: right; color: #1e40af;">${CalcModule.formatCurrency(tr.advanceReceived)}</td>
+                  <td style="padding: 0.6rem; text-align: right; color: ${tr.balanceDue > 0 ? '#b91c1c' : '#15803d'}; font-weight: 700;">${CalcModule.formatCurrency(tr.balanceDue)}</td>
+                  <td style="padding: 0.6rem; text-align: center;">
+                    <span style="font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 9999px; font-weight: 600; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0;">
+                      ${ApiModule.escapeHtml(tr.podStatus || 'Verified')}
+                    </span>
+                  </td>
+                  <td style="padding: 0.6rem; text-align: center;">
+                    <button class="btn btn-xs btn-outline" onclick="AppModule.openEditModal('trip', '${tr.truckId}', '${tr.id}')" title="Edit Trip">✏️</button>
+                    <button class="btn btn-xs btn-outline-danger admin-only" onclick="AppModule.confirmDelete('trip', '${tr.truckId}', '${tr.id}')" title="Delete Trip">🗑️</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="background: #f8fafc; font-weight: 700; border-top: 2px solid #cbd5e1;">
+                <td style="padding: 0.75rem 0.65rem;" colspan="5">TOTALS (${allTrips.length} Shipments)</td>
+                <td style="padding: 0.75rem 0.65rem; text-align: right; color: #15803d;">${CalcModule.formatCurrency(totalFreight)}</td>
+                <td style="padding: 0.75rem 0.65rem; text-align: right; color: #475569;">${CalcModule.formatCurrency(totalBaseFreight)}</td>
+                <td style="padding: 0.75rem 0.65rem; text-align: right; color: #1e40af;">${CalcModule.formatCurrency(totalAdvance)}</td>
+                <td style="padding: 0.75rem 0.65rem; text-align: right; color: #b91c1c;">${CalcModule.formatCurrency(totalBalance)}</td>
+                <td colspan="2"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    `;
+    refreshIcons();
+  }
+
+  /**
+   * 3. Operational Expenses & Fuel Ledger View
+   */
+  function renderExpensesView(truckFilter, filterOptions) {
+    const container = document.getElementById('view-expenses');
+    if (!container) return;
+
+    let trucks = DataModule.getTrucks();
+    if (truckFilter && truckFilter !== 'ALL') {
+      trucks = trucks.filter(t => t.id === truckFilter);
+    }
+
+    let allDiesel = [];
+    let allRoad = [];
+    let allAdvances = [];
+
+    trucks.forEach(t => {
+      (t.diesel || []).forEach(d => {
+        if (CalcModule.matchesFilter(d, filterOptions)) {
+          allDiesel.push({ ...d, truckReg: t.regNumber || t.id, truckId: t.id });
+        }
+      });
+      (t.roadExpenses || []).forEach(r => {
+        if (CalcModule.matchesFilter(r, filterOptions)) {
+          allRoad.push({ ...r, truckReg: t.regNumber || t.id, truckId: t.id });
+        }
+      });
+      (t.advances || []).forEach(a => {
+        if (CalcModule.matchesFilter(a, filterOptions)) {
+          allAdvances.push({ ...a, truckReg: t.regNumber || t.id, driverName: t.driverName, truckId: t.id });
+        }
+      });
+    });
+
+    const totalDieselAmount = allDiesel.reduce((s, d) => s + (Number(d.amount) || 0), 0);
+    const totalRoadAmount = allRoad.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const totalAdvancesAmount = allAdvances.reduce((s, a) => s + (Number(a.amount) || 0), 0);
+
+    container.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+        <div>
+          <h2 style="font-size: 1.4rem; font-weight: 700; color: #0f172a; margin: 0;">⛽ Fleet Operational Expenses &amp; Fuel Ledger</h2>
+          <p style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">
+            Diesel fuel fills, en-route driver road expenses, advances, and FastTag electronic toll expenses ($P_2$).
+          </p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+          <button class="btn btn-secondary" onclick="AppModule.openAddModal('diesel')">＋ Diesel Entry</button>
+          <button class="btn btn-secondary" onclick="AppModule.openAddModal('expense')">＋ Road Expense</button>
+          <button class="btn btn-secondary" onclick="AppModule.openAddModal('advance')">＋ Driver Advance</button>
+          <button class="btn btn-primary" onclick="TableModule.exportToExcel()">📥 Export Excel</button>
+        </div>
+      </div>
+
+      <!-- Expense Summary Highlights -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.85rem; margin-bottom: 1.25rem;">
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1rem;">
+          <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Total Diesel Fuel</span>
+          <div style="font-size: 1.3rem; font-weight: 700; color: #2563eb; margin-top: 0.2rem;">${CalcModule.formatCurrency(totalDieselAmount)}</div>
+          <span style="font-size: 0.72rem; color: #64748b;">${allDiesel.length} Fuel Receipts</span>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1rem;">
+          <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; text-transform: uppercase;">En-Route Road Expenses</span>
+          <div style="font-size: 1.3rem; font-weight: 700; color: #d97706; margin-top: 0.2rem;">${CalcModule.formatCurrency(totalRoadAmount)}</div>
+          <span style="font-size: 0.72rem; color: #64748b;">${allRoad.length} Itemized Entries</span>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1rem;">
+          <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Driver Cash Advances</span>
+          <div style="font-size: 1.3rem; font-weight: 700; color: #b91c1c; margin-top: 0.2rem;">${CalcModule.formatCurrency(totalAdvancesAmount)}</div>
+          <span style="font-size: 0.72rem; color: #64748b;">${allAdvances.length} Advance Slips</span>
+        </div>
+      </div>
+
+      <!-- Audit Notice Box for Road Expenses Variance -->
+      <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.82rem; color: #1e40af; line-height: 1.5;">
+        ℹ️ <strong>Reconciliation Note:</strong> Itemized road receipts for TG15T6666 total <strong>₹28,735</strong> (37 receipts) whereas driver settlement claimed road expenses are <strong>₹28,700</strong> (audit difference of <strong>₹35</strong> is preserved and reconciled per master accounting ledger).
+      </div>
+
+      <!-- Diesel Slips Table -->
+      <div class="excel-card-wrapper" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <div style="padding: 0.85rem 1.25rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="font-size: 0.95rem; font-weight: 700; color: #1e293b; margin: 0;">⛽ Diesel Fuel Refill Slips (${allDiesel.length} Entries)</h3>
+          <button class="btn btn-xs btn-primary" onclick="AppModule.openAddModal('diesel')">＋ Add Fuel Entry</button>
+        </div>
+        <div class="table-responsive-wrapper" style="overflow-x: auto;">
+          <table class="report-data-table" style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+            <thead>
+              <tr style="background: #1e3a8a; color: #ffffff;">
+                <th style="padding: 0.6rem; text-align: left;">Date</th>
+                <th style="padding: 0.6rem; text-align: left;">Vehicle</th>
+                <th style="padding: 0.6rem; text-align: left;">Slip No</th>
+                <th style="padding: 0.6rem; text-align: left;">Petrol Pump / Station</th>
+                <th style="padding: 0.6rem; text-align: right;">Litres</th>
+                <th style="padding: 0.6rem; text-align: right;">Rate / Litre</th>
+                <th style="padding: 0.6rem; text-align: right;">Total Amount</th>
+                <th style="padding: 0.6rem; text-align: center;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${allDiesel.length === 0 ? `
+                <tr><td colspan="8" style="text-align: center; padding: 1.5rem; color: #64748b;">No diesel entries found.</td></tr>
+              ` : allDiesel.map(d => `
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 0.55rem;">${ApiModule.escapeHtml(d.date)}</td>
+                  <td style="padding: 0.55rem; font-weight: 600;">${ApiModule.escapeHtml(d.truckReg)}</td>
+                  <td style="padding: 0.55rem; font-family: monospace;">${ApiModule.escapeHtml(d.slipNo || '-')}</td>
+                  <td style="padding: 0.55rem;">${ApiModule.escapeHtml(d.pumpName || d.location || '-')}</td>
+                  <td style="padding: 0.55rem; text-align: right;">${d.litres ? Number(d.litres).toFixed(2) + ' L' : '-'}</td>
+                  <td style="padding: 0.55rem; text-align: right;">${d.rate ? CalcModule.formatCurrency(d.rate) : '-'}</td>
+                  <td style="padding: 0.55rem; text-align: right; font-weight: 700; color: #1e3a8a;">${CalcModule.formatCurrency(d.amount)}</td>
+                  <td style="padding: 0.55rem; text-align: center;">
+                    <button class="btn btn-xs btn-outline" onclick="AppModule.openEditModal('diesel', '${d.truckId}', '${d.id}')">✏️</button>
+                    <button class="btn btn-xs btn-outline-danger admin-only" onclick="AppModule.confirmDelete('diesel', '${d.truckId}', '${d.id}')">🗑️</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="background: #f8fafc; font-weight: 700; border-top: 2px solid #cbd5e1;">
+                <td style="padding: 0.65rem;" colspan="6">TOTAL FUEL EXPENDITURE</td>
+                <td style="padding: 0.65rem; text-align: right; color: #1e3a8a;">${CalcModule.formatCurrency(totalDieselAmount)}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    `;
+    refreshIcons();
+  }
+
+  /**
+   * 4. Reports & Analytics Center View
+   */
+  function renderReportsView(filterOptions) {
+    const container = document.getElementById('view-reports');
+    if (!container) return;
+
+    const prj = DataModule.getCurrentProject();
+    const trucks = DataModule.getTrucks();
+    const fleet = CalcModule.calculateFleetTotals(trucks, filterOptions);
+
+    container.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+        <div>
+          <h2 style="font-size: 1.4rem; font-weight: 700; color: #0f172a; margin: 0;">📈 Fleet Financial Reports &amp; Analytics</h2>
+          <p style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">
+            Authoritative executive accounts, monthly comparisons, driver liabilities, and verified Excel reports.
+          </p>
+        </div>
+        <button class="btn btn-primary" onclick="TableModule.exportToExcel()">
+          📥 Download Genuine Excel (.xlsx) Report
+        </button>
+      </div>
+
+      <!-- Executive Performance Card -->
+      <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <h3 style="font-size: 1.05rem; font-weight: 700; color: #1e293b; margin: 0 0 1rem 0;">Executive Fleet P&amp;L Summary</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+          <div style="padding: 1rem; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <span style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: 600;">Total Freight Revenue ($P_1$)</span>
+            <div style="font-size: 1.4rem; font-weight: 800; color: #15803d; margin-top: 0.25rem;">${CalcModule.formatCurrency(fleet.combinedRevenue)}</div>
+            <span style="font-size: 0.72rem; color: #64748b;">${fleet.totalTripsCount} Filtered Trips</span>
+          </div>
+          <div style="padding: 1rem; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <span style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: 600;">Total Operating Costs ($P_2$)</span>
+            <div style="font-size: 1.4rem; font-weight: 800; color: #b91c1c; margin-top: 0.25rem;">${CalcModule.formatCurrency(fleet.combinedExpenses)}</div>
+            <span style="font-size: 0.72rem; color: #64748b;">Fuel, Tolls, Comm, Road</span>
+          </div>
+          <div style="padding: 1rem; background: #eff6ff; border-radius: 8px; border: 1px solid #bfdbfe;">
+            <span style="font-size: 0.75rem; color: #1e40af; text-transform: uppercase; font-weight: 600;">Net Operating Profit</span>
+            <div style="font-size: 1.4rem; font-weight: 800; color: #1e3a8a; margin-top: 0.25rem;">${CalcModule.formatCurrency(fleet.combinedNetProfit)}</div>
+            <span style="font-size: 0.72rem; color: #1d4ed8; font-weight: 600;">${fleet.combinedMargin}% Margin</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Truck Contribution Table -->
+      <div class="excel-card-wrapper" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <div style="padding: 0.85rem 1.25rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+          <h3 style="font-size: 0.95rem; font-weight: 700; color: #1e293b; margin: 0;">Vehicle Profitability Breakdown</h3>
+        </div>
+        <div class="table-responsive-wrapper" style="overflow-x: auto;">
+          <table class="report-data-table" style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+            <thead>
+              <tr style="background: #1e3a8a; color: #ffffff;">
+                <th style="padding: 0.65rem; text-align: left;">Vehicle</th>
+                <th style="padding: 0.65rem; text-align: left;">Driver</th>
+                <th style="padding: 0.65rem; text-align: right;">Revenue ($P_1$)</th>
+                <th style="padding: 0.65rem; text-align: right;">Diesel Fuel</th>
+                <th style="padding: 0.65rem; text-align: right;">Road Exp</th>
+                <th style="padding: 0.65rem; text-align: right;">Driver Comm (12%)</th>
+                <th style="padding: 0.65rem; text-align: right;">Operating Exp ($P_2$)</th>
+                <th style="padding: 0.65rem; text-align: right;">Net Profit</th>
+                <th style="padding: 0.65rem; text-align: right;">Margin %</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${fleet.truckPnLs.map(p => `
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 0.6rem; font-weight: 700; color: #1e3a8a;">${ApiModule.escapeHtml(p.regNumber)}</td>
+                  <td style="padding: 0.6rem;">${ApiModule.escapeHtml(p.driverName)}</td>
+                  <td style="padding: 0.6rem; text-align: right; color: #15803d; font-weight: 600;">${CalcModule.formatCurrency(p.totalRevenueP1)}</td>
+                  <td style="padding: 0.6rem; text-align: right;">${CalcModule.formatCurrency(p.totalDiesel)}</td>
+                  <td style="padding: 0.6rem; text-align: right;">${CalcModule.formatCurrency(p.totalRoadExp)}</td>
+                  <td style="padding: 0.6rem; text-align: right;">${CalcModule.formatCurrency(p.driverCommission)}</td>
+                  <td style="padding: 0.6rem; text-align: right; color: #b91c1c; font-weight: 600;">${CalcModule.formatCurrency(p.totalExpensesP2)}</td>
+                  <td style="padding: 0.6rem; text-align: right; color: #1e3a8a; font-weight: 700;">${CalcModule.formatCurrency(p.netProfit)}</td>
+                  <td style="padding: 0.6rem; text-align: right; font-weight: 600;">${p.profitMargin}%</td>
+                </tr>
+              `).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="background: #f8fafc; font-weight: 700; border-top: 2px solid #cbd5e1;">
+                <td style="padding: 0.75rem 0.65rem;" colspan="2">TOTAL FLEET PERFORMANCE</td>
+                <td style="padding: 0.75rem 0.65rem; text-align: right; color: #15803d;">${CalcModule.formatCurrency(fleet.combinedRevenue)}</td>
+                <td style="padding: 0.75rem 0.65rem; text-align: right;">${CalcModule.formatCurrency(fleet.combinedDiesel)}</td>
+                <td style="padding: 0.75rem 0.65rem; text-align: right;">${CalcModule.formatCurrency(fleet.combinedRoadExp)}</td>
+                <td style="padding: 0.75rem 0.65rem; text-align: right;">${CalcModule.formatCurrency(fleet.combinedCommission)}</td>
+                <td style="padding: 0.75rem 0.65rem; text-align: right; color: #b91c1c;">${CalcModule.formatCurrency(fleet.combinedExpenses)}</td>
+                <td style="padding: 0.75rem 0.65rem; text-align: right; color: #1e3a8a;">${CalcModule.formatCurrency(fleet.combinedNetProfit)}</td>
+                <td style="padding: 0.75rem 0.65rem; text-align: right;">${fleet.combinedMargin}%</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    `;
+    refreshIcons();
+  }
+
   return {
     setZoom,
     toggleFullscreen,
@@ -948,6 +1508,10 @@ const TableModule = (function () {
     renderPnlView,
     renderDriverView,
     renderExcelReplica,
+    renderFleetView,
+    renderTripsView,
+    renderExpensesView,
+    renderReportsView,
     exportToExcel
   };
 })();

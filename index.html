@@ -4,12 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Transport Brokerage Ledger — Fleet Logistics &amp; Financial Accounts Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
   <script src="libs/exceljs.min.js"></script>
   <script src="libs/FileSaver.min.js"></script>
   <script src="libs/xlsx.full.min.js"></script>
 </head>
 <body>
+  <noscript>
+    <div style="background: #fee2e2; color: #b91c1c; padding: 1.25rem; font-family: 'Inter', sans-serif; font-weight: 600; text-align: center; border-bottom: 2px solid #ef4444;">
+      ⚠️ JavaScript is disabled. Transport Brokerage Ledger requires JavaScript to be enabled in order to authenticate and manage fleet financial accounts.
+    </div>
+  </noscript>
 
   <!-- 1. FULL-SCREEN PERSONALIZED WELCOME & FETCH SPLASH -->
   <div id="welcomeSplashOverlay" class="welcome-splash-overlay" style="display: none;">
@@ -35,7 +44,7 @@
 
       <div id="loginErrorMsg" style="display: none; color: #b91c1c; background: #fee2e2; border: 1px solid #fca5a5; padding: 0.6rem; border-radius: 6px; font-size: 0.85rem; margin-bottom: 1rem; text-align: center;"></div>
 
-      <form id="authLoginForm" onsubmit="AuthModule.handleLogin(event)">
+      <form id="authLoginForm">
         <!-- Left / Right User Selector -->
         <div class="user-switch-container">
           <label class="user-switch-label">Select User Account</label>
@@ -111,23 +120,41 @@
 
     <!-- Navigation Section (Zero Scrollbar) -->
     <nav class="drawer-menu">
-      <div class="drawer-menu-label">NAVIGATION</div>
-      <button class="drawer-nav-item active" id="drawerNavDashboard" onclick="AppModule.switchView('dashboard'); AppModule.closeSidebar();">
+      <div class="drawer-menu-label">WORKSPACE</div>
+      <button class="drawer-nav-item active" id="drawerNavDashboard" data-view-target="dashboard" onclick="AppModule.switchView('dashboard'); AppModule.closeSidebar();">
         <span class="drawer-item-icon">📊</span>
-        <span>Dashboard</span>
+        <span>Overview</span>
       </button>
-      <button class="drawer-nav-item" id="drawerNavPnl" onclick="AppModule.switchView('pnl'); AppModule.closeSidebar();">
+      <button class="drawer-nav-item" id="drawerNavFleet" data-view-target="fleet" onclick="AppModule.switchView('fleet'); AppModule.closeSidebar();">
+        <span class="drawer-item-icon">🚛</span>
+        <span>Fleet Vehicles</span>
+      </button>
+      <button class="drawer-nav-item" id="drawerNavTrips" data-view-target="trips" onclick="AppModule.switchView('trips'); AppModule.closeSidebar();">
+        <span class="drawer-item-icon">📦</span>
+        <span>Shipment Trips</span>
+      </button>
+      <button class="drawer-nav-item" id="drawerNavPnl" data-view-target="pnl" onclick="AppModule.switchView('pnl'); AppModule.closeSidebar();">
         <span class="drawer-item-icon">💼</span>
-        <span>P&amp;L Accounts</span>
+        <span>Financials (P&amp;L)</span>
       </button>
-      <button class="drawer-nav-item" id="drawerNavDriver" onclick="AppModule.switchView('driver'); AppModule.closeSidebar();">
-        <span class="drawer-item-icon">👤</span>
+      <button class="drawer-nav-item" id="drawerNavExpenses" data-view-target="expenses" onclick="AppModule.switchView('expenses'); AppModule.closeSidebar();">
+        <span class="drawer-item-icon">⛽</span>
+        <span>Expenses &amp; Fuel</span>
+      </button>
+      <button class="drawer-nav-item" id="drawerNavDriver" data-view-target="driver" onclick="AppModule.switchView('driver'); AppModule.closeSidebar();">
+        <span class="drawer-item-icon">🤝</span>
         <span>Driver Settlements</span>
       </button>
-      <button class="drawer-nav-item" id="drawerNavExcel" onclick="AppModule.switchView('excel'); AppModule.closeSidebar();">
+      <button class="drawer-nav-item" id="drawerNavReports" data-view-target="reports" onclick="AppModule.switchView('reports'); AppModule.closeSidebar();">
+        <span class="drawer-item-icon">📈</span>
+        <span>Reports &amp; Analytics</span>
+      </button>
+      <button class="drawer-nav-item" id="drawerNavExcel" data-view-target="excel" onclick="AppModule.switchView('excel'); AppModule.closeSidebar();">
         <span class="drawer-item-icon">📑</span>
         <span>Spreadsheet Replica</span>
       </button>
+
+      <div class="drawer-menu-label" style="margin-top: 1rem;">TOOLS &amp; ACTIONS</div>
       <button class="drawer-nav-item" onclick="AppModule.syncNow(); AppModule.closeSidebar();">
         <span class="drawer-item-icon">🔄</span>
         <span>Sync Cloud Database</span>
@@ -187,8 +214,13 @@
           <h1>Transport Brokerage Ledger</h1>
           <span>Fleet Logistics &amp; Financial Accounts Management</span>
         </div>
+        <!-- Live Location Breadcrumb -->
+        <div class="breadcrumb-container" style="margin-left: 0.85rem; padding-left: 0.85rem; border-left: 1px solid #cbd5e1; display: flex; align-items: center; gap: 0.35rem;">
+          <span style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Workspace /</span>
+          <span id="headerBreadcrumbView" style="font-size: 0.82rem; font-weight: 700; color: #1e3a8a;">Overview • Fleet Command Center</span>
+        </div>
         <!-- Project Switcher & Creator -->
-        <div class="project-selector-wrapper" style="margin-left: 1.25rem; display: flex; align-items: center; gap: 0.4rem;">
+        <div class="project-selector-wrapper" style="margin-left: 1rem; display: flex; align-items: center; gap: 0.4rem;">
           <select id="projectSelectDropdown" class="form-control" onchange="AppModule.selectProject(this.value)" style="font-size: 0.82rem; font-weight: 600; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.35rem 0.6rem; cursor: pointer;"></select>
           <button class="btn btn-xs btn-outline admin-only" onclick="AppModule.openAddProjectModal()" title="Create New Isolated Project" style="white-space: nowrap; font-size: 0.76rem; padding: 0.3rem 0.5rem;">
             ＋ Project
@@ -196,19 +228,31 @@
         </div>
       </div>
 
-      <!-- Navigation Tabs (Center) -->
+      <!-- Navigation Tabs (Center - Enterprise Suite) -->
       <nav class="nav-tabs-group">
-        <button id="btnNavDashboard" class="nav-tab-btn active" onclick="AppModule.switchView('dashboard')">
-          📊 Dashboard
+        <button id="btnNavDashboard" data-view-target="dashboard" class="nav-tab-btn active" onclick="AppModule.switchView('dashboard')">
+          📊 Overview
         </button>
-        <button id="btnNavPnl" class="nav-tab-btn" onclick="AppModule.switchView('pnl')">
-          💼 P&amp;L Accounts
+        <button id="btnNavFleet" data-view-target="fleet" class="nav-tab-btn" onclick="AppModule.switchView('fleet')">
+          🚛 Fleet
         </button>
-        <button id="btnNavDriver" class="nav-tab-btn" onclick="AppModule.switchView('driver')">
-          👤 Driver Settlements
+        <button id="btnNavTrips" data-view-target="trips" class="nav-tab-btn" onclick="AppModule.switchView('trips')">
+          📦 Trips
         </button>
-        <button id="btnNavExcel" class="nav-tab-btn" onclick="AppModule.switchView('excel')">
-          📑 Spreadsheet Replica
+        <button id="btnNavPnl" data-view-target="pnl" class="nav-tab-btn" onclick="AppModule.switchView('pnl')">
+          💼 Financials
+        </button>
+        <button id="btnNavExpenses" data-view-target="expenses" class="nav-tab-btn" onclick="AppModule.switchView('expenses')">
+          ⛽ Expenses
+        </button>
+        <button id="btnNavDriver" data-view-target="driver" class="nav-tab-btn" onclick="AppModule.switchView('driver')">
+          🤝 Settlements
+        </button>
+        <button id="btnNavReports" data-view-target="reports" class="nav-tab-btn" onclick="AppModule.switchView('reports')">
+          📈 Reports
+        </button>
+        <button id="btnNavExcel" data-view-target="excel" class="nav-tab-btn" onclick="AppModule.switchView('excel')">
+          📑 Replica
         </button>
       </nav>
 
@@ -258,11 +302,8 @@
       <div class="filter-controls-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.5rem 0.75rem;">
         <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
           <span style="font-size: 0.8rem; font-weight: 600; color: #475569;">📅 Period:</span>
-          <select id="filterPeriodSelect" class="form-control" onchange="AppModule.selectPeriodFilter(this.value)" style="font-size: 0.82rem; padding: 0.25rem 0.5rem; border-radius: 4px; width: auto;">
-            <option value="2026-10" selected>October 2026 (Active)</option>
-            <option value="2026-09">September 2026 (Archived)</option>
-            <option value="2026-11">November 2026 (Planned)</option>
-            <option value="ALL">All Financial Periods</option>
+          <select id="filterPeriodSelect" class="form-control" style="font-size: 0.82rem; padding: 0.25rem 0.5rem; border-radius: 4px; width: auto;">
+            <!-- Dynamically populated from DataModule.getAccountingPeriods() -->
           </select>
 
           <span style="font-size: 0.8rem; font-weight: 600; color: #475569; margin-left: 0.5rem;">From:</span>
@@ -283,16 +324,28 @@
 
     <!-- Main Viewport Content -->
     <main class="app-main-viewport">
-      <!-- View 1: Executive Dashboard -->
+      <!-- View 1: Executive Dashboard / Overview -->
       <section id="view-dashboard"></section>
 
-      <!-- View 2: P&L Detailed Accounts -->
+      <!-- View 2: Dedicated Fleet Vehicle Management -->
+      <section id="view-fleet" style="display: none;"></section>
+
+      <!-- View 3: Dedicated Shipment Trips Ledger -->
+      <section id="view-trips" style="display: none;"></section>
+
+      <!-- View 4: P&L Detailed Accounts -->
       <section id="view-pnl" style="display: none;"></section>
 
-      <!-- View 3: Driver Settlements & Advances -->
+      <!-- View 5: Dedicated Operating Expenses & Fuel -->
+      <section id="view-expenses" style="display: none;"></section>
+
+      <!-- View 6: Driver Settlements & Advances -->
       <section id="view-driver" style="display: none;"></section>
 
-      <!-- View 4: Excel 1:1 Live Replica -->
+      <!-- View 7: Financial Reports & Analytics -->
+      <section id="view-reports" style="display: none;"></section>
+
+      <!-- View 8: Excel 1:1 Live Replica -->
       <section id="view-excel" style="display: none;"></section>
     </main>
 
@@ -310,12 +363,12 @@
         <h3 id="addModalTitle">➕ Add Financial Entry</h3>
         <button class="modal-close-btn" onclick="AppModule.closeModal()">✕</button>
       </div>
-      <form onsubmit="AppModule.saveModalEntry(event)">
+      <form id="addEntryForm">
         <div class="modal-body">
           <div class="form-row">
             <div class="form-group">
               <label for="modalEntryType">Entry Type</label>
-              <select id="modalEntryType" class="form-control" onchange="AppModule.toggleModalFields(this.value)">
+              <select id="modalEntryType" class="form-control">
                 <option value="trip">Freight Shipment Trip ($P_1$)</option>
                 <option value="diesel">Diesel Fuel Entry ($P_2$)</option>
                 <option value="advance">Driver Advance Payment</option>
@@ -325,8 +378,7 @@
             <div class="form-group">
               <label for="modalTruckSelect">Vehicle Number</label>
               <select id="modalTruckSelect" class="form-control">
-                <option value="TG15T6666">TG15T6666 (Noor Allam)</option>
-                <option value="TS15UE1122">TS15UE1122 (Allam Brother)</option>
+                <!-- Dynamically populated from DataModule.getTrucks() -->
               </select>
             </div>
           </div>
@@ -458,31 +510,31 @@
         </h3>
         <button class="modal-close-btn" onclick="AppModule.closeModal()">✕</button>
       </div>
-      <form onsubmit="AppModule.saveSettings(event)">
+      <form id="settingsForm">
         <div class="modal-body">
           <!-- Administrator Privilege Alert -->
           <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.8rem; color: #1e40af; line-height: 1.5;">
-            🛡️ <strong>Restricted Administrator View:</strong> These production Google Cloud links and settings are visible and accessible strictly to <strong>Admin (Shravan Kumar)</strong>. Standard operators (Rudra) are blocked from accessing or viewing backend infrastructure URLs.
+            🛡️ <strong>Restricted Administrator View:</strong> These production Google Cloud links and settings are visible and accessible strictly to <strong>Admin (Shravan Kumar)</strong>. Standard operators (Rudra) cannot view or configure cloud infrastructure.
           </div>
 
           <!-- Quick Access Action Buttons for Live Google Cloud Assets -->
           <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem; margin-bottom: 1.25rem;">
             <div style="font-size: 0.78rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 0.65rem;">
-              🚀 Verified Production Google Cloud Assets
+              Verified Production Google Cloud Assets
             </div>
             <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-              <a href="https://docs.google.com/spreadsheets/d/1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4/edit?usp=sharing" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="text-decoration: none; color: #065f46; background: #ecfdf5; border-color: #a7f3d0; font-weight: 600;">
+              <a id="settingQuickSheetLink" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="text-decoration: none; color: #065f46; background: #ecfdf5; border-color: #a7f3d0; font-weight: 600;">
                 📊 Google Sheet ↗
               </a>
-              <a href="https://script.google.com/u/0/home/projects/1l4GkXJ-eiX-SzyeGlfBMWc-H32sE2ubeNnq_LDEDXqMtYhU6b4Zls8bL/edit" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="text-decoration: none; color: #1e40af; background: #eff6ff; border-color: #bfdbfe; font-weight: 600;">
+              <a id="settingQuickProjectLink" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="text-decoration: none; color: #1e40af; background: #eff6ff; border-color: #bfdbfe; font-weight: 600;">
                 ⚡ Apps Script Project ↗
               </a>
-              <a href="https://script.google.com/macros/s/AKfycbwREdyxaW64mixcHfFNyspj_KD_jxYYryQWjRukjPiBxdjkNoG0tguD0vaPW0n0cMcinQ/exec" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="text-decoration: none; color: #6b21a8; background: #faf5ff; border-color: #e9d5ff; font-weight: 600;">
+              <a id="settingQuickEndpointLink" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="text-decoration: none; color: #6b21a8; background: #faf5ff; border-color: #e9d5ff; font-weight: 600;">
                 🌐 Web App API Endpoint ↗
               </a>
             </div>
             <div style="margin-top: 0.65rem; font-size: 0.72rem; color: #64748b; line-height: 1.4;">
-              <strong>Active Deployment:</strong> Version 1 (31 Oct 2026, 19:28) • <strong>ID:</strong> <code style="font-size: 0.72rem; background: #e2e8f0; padding: 1px 4px; border-radius: 3px;">AKfycbwREdyxaW64mixcHfFNyspj_KD_jxYYryQWjRukjPiBxdjkNoG0tguD0vaPW0n0cMcinQ</code>
+              <strong>Active Deployment:</strong> Version 1 (Active) • <strong>ID:</strong> <code id="settingDeploymentIdDisplay" style="font-size: 0.72rem; background: #e2e8f0; padding: 1px 4px; border-radius: 3px;">Configured</code>
             </div>
           </div>
 
@@ -498,7 +550,7 @@
               </button>
             </div>
             <small style="color: #64748b; font-size: 0.74rem; display: block; margin-top: 0.3rem;">
-              Dedicated Google Sheet ID: <code>1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4</code>
+              Dedicated Google Sheet ID: <code id="settingSheetIdDisplay">Configured</code>
             </small>
           </div>
 
@@ -536,7 +588,7 @@
         <h3>🔑 Change User Password</h3>
         <button class="modal-close-btn" onclick="AppModule.closeModal()">✕</button>
       </div>
-      <form onsubmit="AppModule.savePasswordChange(event)">
+      <form id="changePasswordForm">
         <div class="modal-body">
           <div style="font-size: 0.88rem; color: #475569; margin-bottom: 1rem;">
             Updating password for account: <strong id="changePwdUserDisplay" style="color: #1e3a8a;">Admin</strong>
