@@ -5,26 +5,16 @@
  * Dedicated Google Spreadsheet:
  * https://docs.google.com/spreadsheets/d/1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4/edit?usp=sharing
  *
- * Google Apps Script Project Editor:
- * https://script.google.com/u/0/home/projects/1l4GkXJ-eiX-SzyeGlfBMWc-H32sE2ubeNnq_LDEDXqMtYhU6b4Zls8bL/edit
- *
  * Active Web App Deployment:
  * URL: https://script.google.com/macros/s/AKfycbwREdyxaW64mixcHfFNyspj_KD_jxYYryQWjRukjPiBxdjkNoG0tguD0vaPW0n0cMcinQ/exec
  * Deployment ID: AKfycbwREdyxaW64mixcHfFNyspj_KD_jxYYryQWjRukjPiBxdjkNoG0tguD0vaPW0n0cMcinQ
- * Version: Version 1 on 31 Oct 2026, 19:28
- *
- * Capabilities:
- * - 30-Second LockService Concurrency Guard
- * - Dedicated Google Spreadsheet Per Project
- * - 12 Standardized Tabs with Dark Blue (#1e3a8a) Frozen Headers
- * - Two-Way Bidirectional Sync & Server Reconciliation
- * - One-Click Initialization Function (initializeMasterSheets)
- * - Custom Spreadsheet UI Menu (🚚 SR Transport)
- * - Automated Google Drive Backup Snapshots
- * - Server-Side RBAC Verification (Admin vs Rudra)
  */
 
-var PRIMARY_SPREADSHEET_ID = "1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4";
+var CONFIG = {
+  SPREADSHEET_ID: "1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4"
+};
+
+var PRIMARY_SPREADSHEET_ID = CONFIG.SPREADSHEET_ID;
 
 var SHEETS = {
   PROJECT_SETTINGS: "Project_Settings",
@@ -41,20 +31,12 @@ var SHEETS = {
   META: "_Meta"
 };
 
-/**
- * Resolves the target Google Spreadsheet.
- * Checks container-bound first, then opens explicit spreadsheetId or PRIMARY_SPREADSHEET_ID.
- */
 function resolveProjectSpreadsheet(spreadsheetId, projectId) {
-  // 1. Try container-bound spreadsheet
   try {
     var bound = SpreadsheetApp.getActiveSpreadsheet();
     if (bound) return bound;
-  } catch (e) {
-    // Not container-bound
-  }
+  } catch (e) {}
 
-  // 2. Open explicit spreadsheet ID if provided or fallback to PRIMARY_SPREADSHEET_ID
   var targetId = (spreadsheetId && spreadsheetId.trim() !== "" && !spreadsheetId.includes("placeholder"))
     ? spreadsheetId.trim()
     : PRIMARY_SPREADSHEET_ID;
@@ -67,12 +49,9 @@ function resolveProjectSpreadsheet(spreadsheetId, projectId) {
     }
   }
 
-  throw new Error("No valid Google Spreadsheet bound or configured. Please configure a Google Spreadsheet ID.");
+  throw new Error("No valid Google Spreadsheet bound or configured.");
 }
 
-/**
- * Adds custom menu when spreadsheet is opened
- */
 function onOpen() {
   try {
     var ui = SpreadsheetApp.getUi();
@@ -80,565 +59,545 @@ function onOpen() {
       .addItem("🔄 Initialize Master Tabs & Schema", "initializeMasterSheets")
       .addItem("💾 Create Drive Backup Snapshot", "createManualBackup")
       .addToUi();
-  } catch (e) {
-    // Silently continue if standalone
-  }
+  } catch (e) {}
 }
 
-/**
- * One-Click Setup Function: Run this once from the Apps Script editor to create & populate all 12 tabs
- */
 function initializeMasterSheets() {
   var ss = resolveProjectSpreadsheet("", "PRJ-001");
   ensureProjectSheetsStructure(ss);
 
-  // Default seed data for October 2026
   var initialStore = {
-    projects: [
-      {
-        id: "PRJ-001",
-        name: "SR Transport Main Fleet",
-        spreadsheetId: PRIMARY_SPREADSHEET_ID,
-        trucks: [
-          {
-            id: "TG15T6666",
-            regNumber: "TG15T6666",
-            driverName: "Noor Allam",
-            driverPhone: "+91 98480 12345",
-            status: "Active",
-            fixedExpenses: { fastTag: 40000, addBlueAndMisc: 15000 },
-            settlementParams: {
-              oldBalance: 13800,
-              oldBalanceNote: "OLD BALC SHANKAR WANT PAY",
-              direction: "PAYABLE_TO_DRIVER",
-              claimedRoadExpenses: 28700,
-              itemizedRoadExpenses: 28735,
-              reconciliationDiff: 35
-            },
-            trips: [
-              { id: "T-6666-01", date: "2026-10-01", dates: "01-10-26 TO 06-10-26", period: "2026-10", from: "MDCL", to: "MADHAPURA", pnlFreight: 175000, baseFreight: 140000, transporter: "SR TRSP", advanceReceived: 130000, balanceDue: 45000, status: "Delivered" },
-              { id: "T-6666-02", date: "2026-10-09", dates: "09-10-26 TO 14-10-26", period: "2026-10", from: "AURGANGABAD", to: "HYD", pnlFreight: 108500, baseFreight: 108500, transporter: "SR TRSP", advanceReceived: 90000, balanceDue: 18500, status: "Delivered" },
-              { id: "T-6666-03", date: "2026-10-15", dates: "15-10-26 TO 17-10-26", period: "2026-10", from: "K\"NAG", to: "KURNOOL", pnlFreight: 72300, baseFreight: 64000, transporter: "SR TRSP", advanceReceived: 50000, balanceDue: 22300, status: "Delivered" },
-              { id: "T-6666-04", date: "2026-10-18", dates: "18-10-26 TO 19-10-26", period: "2026-10", from: "KURNOOL", to: "MDCL", pnlFreight: 27000, baseFreight: 27000, transporter: "SR TRSP", advanceReceived: 20000, balanceDue: 7000, status: "Delivered" }
-            ],
-            diesel: [
-              { id: "D-6666-01", date: "2026-10-02", period: "2026-10", pump: "HPCL Highway Plaza", amount: 30500 },
-              { id: "D-6666-02", date: "2026-10-07", period: "2026-10", pump: "BPCL Express Pump", amount: 30500 },
-              { id: "D-6666-03", date: "2026-10-11", period: "2026-10", pump: "IOCL Grand Trunk", amount: 31600 },
-              { id: "D-6666-04", date: "2026-10-15", period: "2026-10", pump: "Reliance Fuel Care", amount: 13000 },
-              { id: "D-6666-05", date: "2026-10-18", period: "2026-10", pump: "HPCL Mega Diesel Hub", amount: 27000 }
-            ],
-            driverAdvances: [
-              { id: "ADV-6666-01", date: "2026-10-02", period: "2026-10", location: "NAGAPUR ADV", amount: 5000, mode: "Cash" },
-              { id: "ADV-6666-02", date: "2026-10-04", period: "2026-10", location: "VARANSANI ADV", amount: 6000, mode: "Cash" },
-              { id: "ADV-6666-03", date: "2026-10-05", period: "2026-10", location: "MOBILE PH", amount: 2000, mode: "UPI" },
-              { id: "ADV-6666-04", date: "2026-10-08", period: "2026-10", location: "BAHAGALPUR", amount: 3000, mode: "Cash" },
-              { id: "ADV-6666-05", date: "2026-10-11", period: "2026-10", location: "VARANSANI ADV", amount: 7000, mode: "Cash" },
-              { id: "ADV-6666-06", date: "2026-10-12", period: "2026-10", location: "NAGAPUR ADV", amount: 3000, mode: "Cash" },
-              { id: "ADV-6666-07", date: "2026-10-13", period: "2026-10", location: "CHEGUNTA JAFFER DABA", amount: 2000, mode: "Dhaba" },
-              { id: "ADV-6666-08", date: "2026-10-16", period: "2026-10", location: "HOME TRSF", amount: 10000, mode: "Bank Transfer" },
-              { id: "ADV-6666-09", date: "2026-10-17", period: "2026-10", location: "MDCL ADV", amount: 5000, mode: "Cash" },
-              { id: "ADV-6666-10", date: "2026-10-18", period: "2026-10", location: "MOBILE PH", amount: 35200, mode: "UPI" }
-            ],
-            roadExpenses: [
-              { id: "EXP-6666-01", date: "2026-10-01", period: "2026-10", desc: "HYD KANTA", amount: 400, category: "Kanta / Weighbridge" },
-              { id: "EXP-6666-02", date: "2026-10-01", period: "2026-10", desc: "TARPAL", amount: 400, category: "Accessories / Maintenance" },
-              { id: "EXP-6666-03", date: "2026-10-02", period: "2026-10", desc: "BANDARKOLA BODER", amount: 900, category: "Border / Toll" },
-              { id: "EXP-6666-04", date: "2026-10-02", period: "2026-10", desc: "MANSAR BODER", amount: 2600, category: "Border / Toll" },
-              { id: "EXP-6666-05", date: "2026-10-03", period: "2026-10", desc: "KHAWAS BODER", amount: 700, category: "Border / Toll" },
-              { id: "EXP-6666-06", date: "2026-10-03", period: "2026-10", desc: "HANMANA BODER", amount: 900, category: "Border / Toll" },
-              { id: "EXP-6666-07", date: "2026-10-03", period: "2026-10", desc: "HEAD LIGHT BULB", amount: 520, category: "Accessories / Maintenance" },
-              { id: "EXP-6666-08", date: "2026-10-04", period: "2026-10", desc: "KAMANI BOLT", amount: 180, category: "Accessories / Maintenance" },
-              { id: "EXP-6666-09", date: "2026-10-04", period: "2026-10", desc: "BIHAR BODER", amount: 900, category: "Border / Toll" },
-              { id: "EXP-6666-10", date: "2026-10-04", period: "2026-10", desc: "ARA LOUBAR SLIP", amount: 200, category: "Labour / Loading" },
-              { id: "EXP-6666-11", date: "2026-10-05", period: "2026-10", desc: "BEETA PHOOL", amount: 300, category: "Pooja / Traditional" },
-              { id: "EXP-6666-12", date: "2026-10-05", period: "2026-10", desc: "SAMSATIPUR PHOOL", amount: 400, category: "Pooja / Traditional" },
-              { id: "EXP-6666-13", date: "2026-10-05", period: "2026-10", desc: "BIHAR POLICE", amount: 450, category: "Police / Checking" },
-              { id: "EXP-6666-14", date: "2026-10-05", period: "2026-10", desc: "BIHAR PUJA PARCHI", amount: 980, category: "Pooja / Traditional" },
-              { id: "EXP-6666-15", date: "2026-10-06", period: "2026-10", desc: "PARKING", amount: 350, category: "Border / Toll" },
-              { id: "EXP-6666-16", date: "2026-10-06", period: "2026-10", desc: "GERACE", amount: 300, category: "Greasing / Washing" },
-              { id: "EXP-6666-17", date: "2026-10-06", period: "2026-10", desc: "TYRE PUMCHAR", amount: 300, category: "Tyre / Puncture" },
-              { id: "EXP-6666-18", date: "2026-10-07", period: "2026-10", desc: "JABALPUR ENTRY", amount: 1500, category: "Border / Toll" },
-              { id: "EXP-6666-19", date: "2026-10-08", period: "2026-10", desc: "BHAGALPUR PULL", amount: 300, category: "Border / Toll" },
-              { id: "EXP-6666-20", date: "2026-10-08", period: "2026-10", desc: "BHAGALPUR KANTA", amount: 180, category: "Kanta / Weighbridge" },
-              { id: "EXP-6666-21", date: "2026-10-09", period: "2026-10", desc: "POJJA PACHEE", amount: 670, category: "Pooja / Traditional" },
-              { id: "EXP-6666-22", date: "2026-10-10", period: "2026-10", desc: "AURGANABAD LOUDING", amount: 1100, category: "Labour / Loading" },
-              { id: "EXP-6666-23", date: "2026-10-10", period: "2026-10", desc: "KANTA", amount: 300, category: "Kanta / Weighbridge" },
-              { id: "EXP-6666-24", date: "2026-10-10", period: "2026-10", desc: "MUNSI AURGANBAD", amount: 450, category: "Labour / Loading" },
-              { id: "EXP-6666-25", date: "2026-10-11", period: "2026-10", desc: "BIHAR BODER", amount: 900, category: "Border / Toll" },
-              { id: "EXP-6666-26", date: "2026-10-11", period: "2026-10", desc: "HANMANA BODER", amount: 900, category: "Border / Toll" },
-              { id: "EXP-6666-27", date: "2026-10-12", period: "2026-10", desc: "KHAWAS BODER", amount: 700, category: "Border / Toll" },
-              { id: "EXP-6666-28", date: "2026-10-12", period: "2026-10", desc: "BANDARKOLA BODER", amount: 4500, category: "Border / Toll" },
-              { id: "EXP-6666-29", date: "2026-10-13", period: "2026-10", desc: "BANDARKOLA BODER", amount: 700, category: "Border / Toll" },
-              { id: "EXP-6666-30", date: "2026-10-14", period: "2026-10", desc: "LORRY RUBBER STOP", amount: 1800, category: "Accessories / Maintenance" },
-              { id: "EXP-6666-31", date: "2026-10-15", period: "2026-10", desc: "HYD TRSP LOUDING", amount: 300, category: "Labour / Loading" },
-              { id: "EXP-6666-32", date: "2026-10-15", period: "2026-10", desc: "GERACE", amount: 600, category: "Greasing / Washing" },
-              { id: "EXP-6666-33", date: "2026-10-16", period: "2026-10", desc: "TYRE PUMCHAR", amount: 250, category: "Tyre / Puncture" },
-              { id: "EXP-6666-34", date: "2026-10-16", period: "2026-10", desc: "TUBE", amount: 1450, category: "Accessories / Maintenance" },
-              { id: "EXP-6666-35", date: "2026-10-17", period: "2026-10", desc: "KURNOOL UNLODING", amount: 480, category: "Labour / Loading" },
-              { id: "EXP-6666-36", date: "2026-10-18", period: "2026-10", desc: "KURNOOL OVER LOUD TOLL", amount: 675, category: "Border / Toll" },
-              { id: "EXP-6666-37", date: "2026-10-19", period: "2026-10", desc: "LOUDING DASSHERA MAMUL", amount: 200, category: "Pooja / Traditional" }
-            ]
-          },
-          {
-            id: "TS15UE1122",
-            regNumber: "TS15UE1122",
-            driverName: "Allam Brother",
-            driverPhone: "+91 98480 67890",
-            status: "Active",
-            fixedExpenses: { fastTag: 25000, addBlueAndMisc: 20000 },
-            settlementParams: {
-              oldBalance: 62340,
-              oldBalanceNote: "OLD ALLAM WANT PAY",
-              direction: "PAYABLE_BY_DRIVER",
-              claimedRoadExpenses: 11790,
-              itemizedRoadExpenses: 11790,
-              reconciliationDiff: 0
-            },
-            trips: [
-              { id: "T-1122-01", date: "2026-10-04", dates: "04-10-26 TO 06-10-26", period: "2026-10", from: "MDCL", to: "CHEGUNTA", pnlFreight: 15000, baseFreight: 10000, transporter: "SR TRSP", advanceReceived: 10000, balanceDue: 5000, status: "Delivered" },
-              { id: "T-1122-02", date: "2026-10-06", dates: "06-10-26 TO 09-10-26", period: "2026-10", from: "MDCL", to: "MUZZFARPUR", pnlFreight: 141000, baseFreight: 114000, transporter: "SR TRSP", advanceReceived: 110000, balanceDue: 31000, status: "Delivered" },
-              { id: "T-1122-03", date: "2026-10-11", dates: "11-10-26 TO 13-10-26", period: "2026-10", from: "JABALPUR", to: "BHONIGIRI", pnlFreight: 80000, baseFreight: 75000, transporter: "SR TRSP", advanceReceived: 60000, balanceDue: 20000, status: "Delivered" }
-            ],
-            diesel: [
-              { id: "D-1122-01", date: "2026-10-04", period: "2026-10", pump: "BPCL Express Highway", amount: 24000 },
-              { id: "D-1122-02", date: "2026-10-08", period: "2026-10", pump: "HPCL City Border", amount: 19000 },
-              { id: "D-1122-03", date: "2026-10-11", period: "2026-10", pump: "IOCL National Route", amount: 23000 },
-              { id: "D-1122-04", date: "2026-10-14", period: "2026-10", pump: "Reliance Petro Station", amount: 10000 },
-              { id: "D-1122-05", date: "2026-10-17", period: "2026-10", pump: "BPCL Super Hub", amount: 27000 }
-            ],
-            driverAdvances: [
-              { id: "ADV-1122-01", date: "2026-10-06", period: "2026-10", location: "MDCL ADV", amount: 2500, mode: "Cash" },
-              { id: "ADV-1122-02", date: "2026-10-07", period: "2026-10", location: "NAGAPUR", amount: 5000, mode: "Cash" },
-              { id: "ADV-1122-03", date: "2026-10-08", period: "2026-10", location: "ADVANCE", amount: 5000, mode: "Cash" },
-              { id: "ADV-1122-04", date: "2026-10-08", period: "2026-10", location: "HOME TRSF", amount: 20000, mode: "Bank Transfer" },
-              { id: "ADV-1122-05", date: "2026-10-10", period: "2026-10", location: "ADVANCE", amount: 5000, mode: "Cash" },
-              { id: "ADV-1122-06", date: "2026-10-14", period: "2026-10", location: "CHANDRAPUR", amount: 4000, mode: "Cash" }
-            ],
-            roadExpenses: [
-              { id: "EXP-1122-01", date: "2026-10-04", period: "2026-10", desc: "POLICE PARCHI", amount: 430, category: "Police / Checking" },
-              { id: "EXP-1122-02", date: "2026-10-04", period: "2026-10", desc: "MOHINA BODER", amount: 500, category: "Border / Toll" },
-              { id: "EXP-1122-03", date: "2026-10-05", period: "2026-10", desc: "ARRA LABOUR", amount: 200, category: "Labour / Loading" },
-              { id: "EXP-1122-04", date: "2026-10-05", period: "2026-10", desc: "HANMANA BODER", amount: 700, category: "Border / Toll" },
-              { id: "EXP-1122-05", date: "2026-10-05", period: "2026-10", desc: "JABALPUR CHAI PANI", amount: 200, category: "Labour / Loading" },
-              { id: "EXP-1122-06", date: "2026-10-06", period: "2026-10", desc: "KHAWASA BODER", amount: 700, category: "Border / Toll" },
-              { id: "EXP-1122-07", date: "2026-10-06", period: "2026-10", desc: "MANASAR BODER", amount: 900, category: "Border / Toll" },
-              { id: "EXP-1122-08", date: "2026-10-06", period: "2026-10", desc: "CHANDARPUR BODER", amount: 900, category: "Border / Toll" },
-              { id: "EXP-1122-09", date: "2026-10-07", period: "2026-10", desc: "CHANDARPUR PS", amount: 300, category: "Police / Checking" },
-              { id: "EXP-1122-10", date: "2026-10-07", period: "2026-10", desc: "TYRE PUMCHAR", amount: 650, category: "Tyre / Puncture" },
-              { id: "EXP-1122-11", date: "2026-10-07", period: "2026-10", desc: "GREACE", amount: 300, category: "Greasing / Washing" },
-              { id: "EXP-1122-12", date: "2026-10-08", period: "2026-10", desc: "MDCL KANTA", amount: 100, category: "Kanta / Weighbridge" },
-              { id: "EXP-1122-13", date: "2026-10-08", period: "2026-10", desc: "PANDARKOLA BODER", amount: 700, category: "Border / Toll" },
-              { id: "EXP-1122-14", date: "2026-10-09", period: "2026-10", desc: "MANASAR BODER", amount: 900, category: "Border / Toll" },
-              { id: "EXP-1122-15", date: "2026-10-10", period: "2026-10", desc: "KHAWASA BODER", amount: 700, category: "Border / Toll" },
-              { id: "EXP-1122-16", date: "2026-10-11", period: "2026-10", desc: "HANMANA BODER", amount: 900, category: "Border / Toll" },
-              { id: "EXP-1122-17", date: "2026-10-11", period: "2026-10", desc: "MOHINA BODER", amount: 800, category: "Border / Toll" },
-              { id: "EXP-1122-18", date: "2026-10-12", period: "2026-10", desc: "ARRA LABOUR", amount: 200, category: "Labour / Loading" },
-              { id: "EXP-1122-19", date: "2026-10-12", period: "2026-10", desc: "CHAPPRA BODER", amount: 400, category: "Border / Toll" },
-              { id: "EXP-1122-20", date: "2026-10-13", period: "2026-10", desc: "PS KACHARA", amount: 380, category: "Police / Checking" },
-              { id: "EXP-1122-21", date: "2026-10-13", period: "2026-10", desc: "PUJJA PARCHI", amount: 630, category: "Pooja / Traditional" },
-              { id: "EXP-1122-22", date: "2026-10-14", period: "2026-10", desc: "GREACE", amount: 300, category: "Greasing / Washing" }
-            ]
-          }
+    version: 3,
+    lastUpdated: new Date().toISOString(),
+    activePeriod: "2026-10",
+    trucks: [
+      { id: "TG15T6666", regNumber: "TG15T6666", driverId: "DRV-001", model: "BharatBenz 3528C", capacity: "35 Tons", status: "Active" },
+      { id: "TS15UE1122", regNumber: "TS15UE1122", driverId: "DRV-002", model: "Tata Signa 3523", capacity: "35 Tons", status: "Active" }
+    ],
+    drivers: [
+      { id: "DRV-001", name: "Noor Allam", phone: "+91 98765 43210", truckId: "TG15T6666", commissionRate: 0.12, status: "Active" },
+      { id: "DRV-002", name: "Allam Brother", phone: "+91 98765 43211", truckId: "TS15UE1122", commissionRate: 0.12, status: "Active" }
+    ],
+    pnlData: {
+      "TG15T6666": {
+        truckId: "TG15T6666", driverName: "Noor Allam", period: "October 2026", oldBalance: 13800,
+        revenue: { p1Freight: 382800, baseFreight: 339500, haltage: 0, loadingCharges: 0, detention: 0 },
+        expenses: { dieselTotal: 132600, roadTotalClaimed: 28700, roadTotalItemized: 28735, driverCommission: 40740, fastagCharges: 40000, fixedTotal: 55000 },
+        trips: [
+          { id: "TRP-66-1", date: "2026-10-02", source: "MDCL", destination: "MADHAPURA", freightP1: 175000, baseFreight: 140000, dieselAmount: 62000, roadExpenses: 13500 },
+          { id: "TRP-66-2", date: "2026-10-09", source: "AURGANGABAD", destination: "HYD", freightP1: 108500, baseFreight: 108500, dieselAmount: 38000, roadExpenses: 8200 },
+          { id: "TRP-66-3", date: "2026-10-15", source: "K\"NAG", destination: "KURNOOL", freightP1: 72300, baseFreight: 64000, dieselAmount: 18000, roadExpenses: 4500 },
+          { id: "TRP-66-4", date: "2026-10-18", source: "KURNOOL", destination: "MDCL", freightP1: 27000, baseFreight: 27000, dieselAmount: 14600, roadExpenses: 2500 }
+        ],
+        dieselLogs: [
+          { id: "DSL-66-1", date: "2026-10-02", pump: "IndianOil Hyd", liters: 338.89, rate: 90, amount: 30500 },
+          { id: "DSL-66-2", date: "2026-10-08", pump: "BPCL Nagpur", liters: 338.89, rate: 90, amount: 30500 },
+          { id: "DSL-66-3", date: "2026-10-14", pump: "HPCL Raipur", liters: 351.11, rate: 90, amount: 31600 },
+          { id: "DSL-66-4", date: "2026-10-17", pump: "IndianOil Kurnool", liters: 144.44, rate: 90, amount: 13000 },
+          { id: "DSL-66-5", date: "2026-10-19", pump: "Reliance Hyd", liters: 300.00, rate: 90, amount: 27000 }
+        ],
+        advances: [
+          { id: "ADV-66-1", date: "2026-10-01", type: "Cash", purpose: "NAGAPUR ADV", amount: 5000 },
+          { id: "ADV-66-2", date: "2026-10-03", type: "Bank", purpose: "VARANSANI ADV", amount: 6000 },
+          { id: "ADV-66-3", date: "2026-10-05", type: "Cash", purpose: "MOBILE PH", amount: 2000 },
+          { id: "ADV-66-4", date: "2026-10-08", type: "Cash", purpose: "BAHAGALPUR", amount: 3000 },
+          { id: "ADV-66-5", date: "2026-10-10", type: "Bank", purpose: "VARANSANI ADV", amount: 7000 },
+          { id: "ADV-66-6", date: "2026-10-12", type: "Cash", purpose: "NAGAPUR ADV", amount: 3000 },
+          { id: "ADV-66-7", date: "2026-10-14", type: "Cash", purpose: "CHEGUNTA JAFFER DABA", amount: 2000 },
+          { id: "ADV-66-8", date: "2026-10-16", type: "Bank", purpose: "HOME TRSF", amount: 10000 },
+          { id: "ADV-66-9", date: "2026-10-18", type: "Cash", purpose: "MDCL ADV", amount: 5000 },
+          { id: "ADV-66-10", date: "2026-10-20", type: "Cash", purpose: "MOBILE PH", amount: 35200 }
+        ],
+        roadExpenseItems: [
+          { id: "RXP-66-1", date: "2026-10-03", category: "Toll / RTO", desc: "HYD KANTA + TARPAL", amount: 800 },
+          { id: "RXP-66-2", date: "2026-10-08", category: "Police / Border", desc: "Borders & Checks", amount: 4200 },
+          { id: "RXP-66-3", date: "2026-10-15", category: "Loading / Unloading", desc: "Labor & Vouchers", amount: 23735 }
+        ],
+        otherExpenses: [
+          { id: "OXP-66-1", date: "2026-10-05", category: "FastTag", desc: "FastTag Toll Recharge", amount: 40000 },
+          { id: "OXP-66-2", date: "2026-10-20", category: "Miscellaneous", desc: "AddBlue & Maintenance", amount: 15000 }
+        ]
+      },
+      "TS15UE1122": {
+        truckId: "TS15UE1122", driverName: "Allam Brother", period: "October 2026", oldBalance: 62340,
+        revenue: { p1Freight: 236000, baseFreight: 199000, haltage: 0, loadingCharges: 0, detention: 0 },
+        expenses: { dieselTotal: 103000, roadTotalClaimed: 11790, roadTotalItemized: 11790, driverCommission: 23880, fastagCharges: 25000, fixedTotal: 45000 },
+        trips: [
+          { id: "TRP-11-1", date: "2026-10-04", source: "MDCL", destination: "CHEGUNTA", freightP1: 15000, baseFreight: 10000, dieselAmount: 24000, roadExpenses: 2500 },
+          { id: "TRP-11-2", date: "2026-10-06", source: "MDCL", destination: "MUZZFARPUR", freightP1: 141000, baseFreight: 114000, dieselAmount: 42000, roadExpenses: 5290 },
+          { id: "TRP-11-3", date: "2026-10-11", source: "JABALPUR", destination: "BHONIGIRI", freightP1: 80000, baseFreight: 75000, dieselAmount: 37000, roadExpenses: 4000 }
+        ],
+        dieselLogs: [
+          { id: "DSL-11-1", date: "2026-10-05", pump: "IndianOil Hyd", liters: 266.67, rate: 90, amount: 24000 },
+          { id: "DSL-11-2", date: "2026-10-09", pump: "HPCL Vijayawada", liters: 211.11, rate: 90, amount: 19000 },
+          { id: "DSL-11-3", date: "2026-10-12", pump: "BPCL Jabalpur", liters: 255.56, rate: 90, amount: 23000 },
+          { id: "DSL-11-4", date: "2026-10-16", pump: "IndianOil Bhonigiri", liters: 111.11, rate: 90, amount: 10000 },
+          { id: "DSL-11-5", date: "2026-10-18", pump: "Reliance Hyd", liters: 300.00, rate: 90, amount: 27000 }
+        ],
+        advances: [
+          { id: "ADV-11-1", date: "2026-10-04", type: "Cash", purpose: "MDCL ADV", amount: 2500 },
+          { id: "ADV-11-2", date: "2026-10-06", type: "Cash", purpose: "NAGAPUR", amount: 5000 },
+          { id: "ADV-11-3", date: "2026-10-08", type: "Cash", purpose: "EN ROUTE", amount: 5000 },
+          { id: "ADV-11-4", date: "2026-10-10", type: "Bank", purpose: "HOME TRSF", amount: 20000 },
+          { id: "ADV-11-5", date: "2026-10-13", type: "Cash", purpose: "JABALPUR", amount: 5000 },
+          { id: "ADV-11-6", date: "2026-10-15", type: "Cash", purpose: "CHANDRAPUR", amount: 4000 }
+        ],
+        roadExpenseItems: [
+          { id: "RXP-11-1", date: "2026-10-06", category: "Toll / RTO", desc: "Police Parchi & Tolls", amount: 4300 },
+          { id: "RXP-11-2", date: "2026-10-14", category: "Loading / Unloading", desc: "Labor & Checkpost Vouchers", amount: 7490 }
+        ],
+        otherExpenses: [
+          { id: "OXP-11-1", date: "2026-10-05", category: "FastTag", desc: "FastTag Toll Recharge", amount: 25000 },
+          { id: "OXP-11-2", date: "2026-10-20", category: "Miscellaneous", desc: "AddBlue & Maintenance", amount: 20000 }
         ]
       }
-    ]
+    }
   };
 
-  processSyncLedgerData(ss, initialStore, "PRJ-001", "InitialSetup");
-  Logger.log("✅ Successfully initialized all 12 tabs with verified master data!");
-}
-
-function createManualBackup() {
-  var ss = resolveProjectSpreadsheet("", "PRJ-001");
-  createDriveBackupSnapshot(ss, "PRJ-001");
-}
-
-/**
- * HTTP GET: Lightweight status checks & version polling
- */
-function doGet(e) {
-  var params = e ? e.parameter : {};
-  var action = params.action || "ping";
-  var projectId = params.projectId || "PRJ-001";
-  var spreadsheetId = params.spreadsheetId || PRIMARY_SPREADSHEET_ID;
-
-  if (action === "ping") {
-    return createJsonResponse({
-      success: true,
-      status: "ONLINE",
-      version: "2.0.0",
-      spreadsheetId: PRIMARY_SPREADSHEET_ID,
-      timestamp: new Date().toISOString()
-    });
-  }
-
-  try {
-    var ss = resolveProjectSpreadsheet(spreadsheetId, projectId);
-    ensureProjectSheetsStructure(ss);
-
-    if (action === "getVersion") {
-      var metaSheet = getOrCreateMetaSheet(ss);
-      return createJsonResponse({
-        success: true,
-        projectId: projectId,
-        version: parseInt(metaSheet.getRange(1, 2).getValue(), 10) || 1,
-        lastUpdated: metaSheet.getRange(2, 2).getValue()
-      });
-    }
-
-    return createJsonResponse({
-      success: true,
-      status: "READY",
-      projectId: projectId,
-      spreadsheetName: ss.getName()
-    });
-
-  } catch (err) {
-    return createJsonResponse({
-      success: false,
-      error: "SPREADSHEET_ACCESS_ERROR",
-      message: err.message
-    });
-  }
-}
-
-/**
- * HTTP POST: Atomic mutations with 30s LockService Concurrency Guard
- */
-function doPost(e) {
-  var lock = LockService.getScriptLock();
-  var hasLock = false;
-
-  try {
-    hasLock = lock.waitLock(30000); // 30-second atomic lock
-  } catch (err) {
-    return createJsonResponse({
-      success: false,
-      error: "CONCURRENCY_TIMEOUT",
-      message: "The spreadsheet is locked by another operation. Please retry."
-    });
-  }
-
-  if (!hasLock) {
-    return createJsonResponse({
-      success: false,
-      error: "LOCK_ACQUISITION_FAILED",
-      message: "Unable to acquire concurrency lock."
-    });
-  }
-
-  try {
-    var raw = e.postData ? e.postData.contents : "{}";
-    var req = JSON.parse(raw);
-    var action = req.action || "syncLedgerData";
-    var projectId = req.projectId || "PRJ-001";
-    var spreadsheetId = req.spreadsheetId || PRIMARY_SPREADSHEET_ID;
-    var user = req.user || "Anonymous";
-    var role = req.role || "USER";
-
-    var ss = resolveProjectSpreadsheet(spreadsheetId, projectId);
-    ensureProjectSheetsStructure(ss);
-
-    // Automatic Google Drive safety snapshot before mutations
-    createDriveBackupSnapshot(ss, projectId);
-
-    if (action === "syncLedgerData") {
-      var syncResult = processSyncLedgerData(ss, req.store, projectId, user);
-      return createJsonResponse(syncResult);
-    }
-
-    if (action === "deleteRecord") {
-      // Server-side RBAC verification: Only ADMIN can perform deletions
-      if (role !== "ADMIN" && user !== "Admin" && user !== "Shravan") {
-        return createJsonResponse({
-          success: false,
-          error: "DELETE_UNAUTHORIZED",
-          message: "User " + user + " (Role: " + role + ") is not authorized to delete ledger records."
-        });
-      }
-      var delResult = processDeleteRecord(ss, req.recordType, req.truckId, req.recordId, user);
-      return createJsonResponse(delResult);
-    }
-
-    return createJsonResponse({
-      success: false,
-      error: "UNKNOWN_ACTION",
-      action: action
-    });
-
-  } catch (err) {
-    return createJsonResponse({
-      success: false,
-      error: "SERVER_ERROR",
-      message: err.message
-    });
-  } finally {
-    if (lock) lock.releaseLock();
-  }
-}
-
-/**
- * Syncs full ledger state to Google Sheets tabs
- */
-function processSyncLedgerData(ss, store, projectId, user) {
-  if (!store || !store.projects) {
-    throw new Error("Invalid payload: store with projects array is required.");
-  }
-
-  var project = store.projects.find(function (p) { return p.id === projectId; });
-  if (!project) {
-    project = store.projects[0];
-  }
-
-  var trucks = project.trucks || [];
-
-  // 1. Sync Fleet Tab
-  syncFleetTab(ss, trucks);
-
-  // 2. Sync Trips Tab
-  syncTripsTab(ss, trucks, projectId);
-
-  // 3. Sync Diesel Tab
-  syncDieselTab(ss, trucks, projectId);
-
-  // 4. Sync Road Expenses Tab
-  syncRoadExpensesTab(ss, trucks, projectId);
-
-  // 5. Sync Advances Tab
-  syncAdvancesTab(ss, trucks, projectId);
-
-  // 6. Sync Driver Settlements Tab
-  syncDriverSettlementsTab(ss, trucks, projectId);
-
-  // 7. Bump Version & Log Audit
-  var meta = getOrCreateMetaSheet(ss);
-  var curVer = parseInt(meta.getRange(1, 2).getValue(), 10) || 1;
-  var nextVer = curVer + 1;
-  meta.getRange(1, 2).setValue(nextVer);
-  meta.getRange(2, 2).setValue(new Date().toISOString());
-  meta.getRange(3, 2).setValue(user);
-
-  logAudit(ss, "SYNC_LEDGER_DATA", user, "Synchronized " + trucks.length + " trucks for project " + projectId);
-
-  return {
-    success: true,
-    projectId: projectId,
-    version: nextVer,
-    lastUpdated: new Date().toISOString(),
-    store: store // Echo reconciled store back to client
-  };
-}
-
-function syncFleetTab(ss, trucks) {
-  var sheet = ss.getSheetByName(SHEETS.FLEET);
-  if (!sheet) return;
-  var rows = [["Truck ID", "Registration", "Driver Name", "Driver Phone", "Status", "FastTag Fixed", "AddBlue Fixed", "Updated At"]];
-  trucks.forEach(function (t) {
-    rows.push([
-      t.id,
-      t.regNumber || t.id,
-      t.driverName || "",
-      t.driverPhone || "",
-      t.status || "Active",
-      (t.fixedExpenses && t.fixedExpenses.fastTag) || 0,
-      (t.fixedExpenses && t.fixedExpenses.addBlueAndMisc) || 0,
-      new Date().toISOString()
-    ]);
-  });
-  sheet.clearContents();
-  sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
-  formatHeaderRow(sheet, rows[0].length);
-}
-
-function syncTripsTab(ss, trucks, projectId) {
-  var sheet = ss.getSheetByName(SHEETS.TRIPS);
-  if (!sheet) return;
-  var rows = [["Trip ID", "Project ID", "Truck ID", "Date", "Dates Range", "Period", "From", "To", "PnL Freight", "Base Freight", "Transporter", "Advance Received", "Balance Due", "Status"]];
-  trucks.forEach(function (t) {
-    (t.trips || []).forEach(function (tr) {
-      rows.push([
-        tr.id,
-        projectId,
-        t.id,
-        tr.date || "",
-        tr.dates || "",
-        tr.period || "2026-10",
-        tr.from || "",
-        tr.to || "",
-        Number(tr.pnlFreight) || 0,
-        Number(tr.baseFreight) || 0,
-        tr.transporter || "SR TRSP",
-        Number(tr.advanceReceived) || 0,
-        Number(tr.balanceDue) || 0,
-        tr.status || "Delivered"
-      ]);
-    });
-  });
-  sheet.clearContents();
-  sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
-  formatHeaderRow(sheet, rows[0].length);
-}
-
-function syncDieselTab(ss, trucks, projectId) {
-  var sheet = ss.getSheetByName(SHEETS.DIESEL_ENTRIES);
-  if (!sheet) return;
-  var rows = [["Diesel ID", "Project ID", "Truck ID", "Date", "Period", "Pump Location", "Amount"]];
-  trucks.forEach(function (t) {
-    (t.diesel || []).forEach(function (d) {
-      rows.push([
-        d.id,
-        projectId,
-        t.id,
-        d.date || "",
-        d.period || "2026-10",
-        d.pump || "",
-        Number(d.amount) || 0
-      ]);
-    });
-  });
-  sheet.clearContents();
-  sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
-  formatHeaderRow(sheet, rows[0].length);
-}
-
-function syncRoadExpensesTab(ss, trucks, projectId) {
-  var sheet = ss.getSheetByName(SHEETS.ROAD_EXPENSES);
-  if (!sheet) return;
-  var rows = [["Expense ID", "Project ID", "Truck ID", "Date", "Period", "Description", "Amount", "Category"]];
-  trucks.forEach(function (t) {
-    (t.roadExpenses || []).forEach(function (e) {
-      rows.push([
-        e.id,
-        projectId,
-        t.id,
-        e.date || "",
-        e.period || "2026-10",
-        e.desc || "",
-        Number(e.amount) || 0,
-        e.category || "General"
-      ]);
-    });
-  });
-  sheet.clearContents();
-  sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
-  formatHeaderRow(sheet, rows[0].length);
-}
-
-function syncAdvancesTab(ss, trucks, projectId) {
-  var sheet = ss.getSheetByName(SHEETS.ADVANCES);
-  if (!sheet) return;
-  var rows = [["Advance ID", "Project ID", "Truck ID", "Date", "Period", "Location", "Amount", "Mode"]];
-  trucks.forEach(function (t) {
-    (t.driverAdvances || []).forEach(function (a) {
-      rows.push([
-        a.id,
-        projectId,
-        t.id,
-        a.date || "",
-        a.period || "2026-10",
-        a.location || "",
-        Number(a.amount) || 0,
-        a.mode || "Cash"
-      ]);
-    });
-  });
-  sheet.clearContents();
-  sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
-  formatHeaderRow(sheet, rows[0].length);
-}
-
-function syncDriverSettlementsTab(ss, trucks, projectId) {
-  var sheet = ss.getSheetByName(SHEETS.DRIVER_SETTLEMENTS);
-  if (!sheet) return;
-  var rows = [["Settlement ID", "Project ID", "Truck ID", "Period", "Base Freight Total", "Commission 12%", "Advances Total", "Road Expenses Total", "Claimed Expenses", "Reconciliation Diff", "Old Balance", "Direction", "Net Balance", "Updated At"]];
-  trucks.forEach(function (t) {
-    var p = t.settlementParams || {};
-    var baseTotal = (t.trips || []).reduce(function (sum, tr) { return sum + (Number(tr.baseFreight) || 0); }, 0);
-    var comm = Math.round(baseTotal * 0.12);
-    var advTotal = (t.driverAdvances || []).reduce(function (sum, a) { return sum + (Number(a.amount) || 0); }, 0);
-    var expTotal = (t.roadExpenses || []).reduce(function (sum, e) { return sum + (Number(e.amount) || 0); }, 0);
-    var claimed = p.claimedRoadExpenses || expTotal;
-    var diff = Math.abs(expTotal - claimed);
-    var oldBal = Number(p.oldBalance) || 0;
-    var net = 0;
-    if (p.direction === "PAYABLE_TO_DRIVER") {
-      net = (comm + claimed + oldBal) - advTotal;
-    } else {
-      net = oldBal + (advTotal - (comm + claimed));
-    }
-
-    rows.push([
-      "SET-" + t.id + "-2026-10",
-      projectId,
-      t.id,
-      "2026-10",
-      baseTotal,
-      comm,
-      advTotal,
-      expTotal,
-      claimed,
-      diff,
-      oldBal,
-      p.direction || "AUTO",
-      net,
-      new Date().toISOString()
-    ]);
-  });
-  sheet.clearContents();
-  sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
-  formatHeaderRow(sheet, rows[0].length);
+  syncStateToSheets(ss, initialStore, "System Init");
 }
 
 function ensureProjectSheetsStructure(ss) {
-  Object.keys(SHEETS).forEach(function (k) {
-    var name = SHEETS[k];
-    if (!ss.getSheetByName(name)) {
-      ss.insertSheet(name);
+  var headers = {
+    Project_Settings: ["Setting Key", "Value", "Description", "Last Updated"],
+    Fleet: ["Truck ID", "Registration No", "Assigned Driver ID", "Model", "Capacity", "Status"],
+    Drivers: ["Driver ID", "Driver Name", "Phone", "Assigned Truck ID", "Commission Rate", "Status"],
+    PL_Accounts: ["Truck ID", "Period", "Driver Name", "P1 Freight", "Base Freight", "Diesel Exp", "Road Exp Claimed", "Road Exp Itemized", "Driver Comm", "Fixed Exp", "Net Profit", "Net Margin %", "Driver Settlement Balance"],
+    Trips: ["Trip ID", "Truck ID", "Date", "Source", "Destination", "P1 Freight", "Base Freight", "Diesel Cost", "Road Expenses", "Net Trip Margin"],
+    Diesel_Entries: ["Log ID", "Truck ID", "Date", "Petrol Pump", "Liters", "Rate / Liter", "Total Amount"],
+    Driver_Settlements: ["Settlement ID", "Truck ID", "Driver ID", "Period", "Total Advance", "Road Expenses Covered", "Driver Commission Earned", "Balance Payable / Receivable", "Status"],
+    Road_Expenses: ["Expense ID", "Truck ID", "Date", "Category", "Description", "Amount"],
+    Advances: ["Advance ID", "Truck ID", "Driver ID", "Date", "Payment Type", "Purpose", "Amount"],
+    Monthly_Archives: ["Archive ID", "Project ID", "Period", "Trucks Active", "Total Revenue", "Total Diesel", "Total Driver Comm", "Total Expenses", "Net Profit", "Archive Date"],
+    Audit_Log: ["Timestamp", "User", "Action", "Record Type", "Record ID", "Details"],
+    _Meta: ["Meta Key", "Meta Value", "Updated At"]
+  };
+
+  Object.keys(headers).forEach(function(sheetName) {
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+      sheet = ss.insertSheet(sheetName);
+    }
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(headers[sheetName]);
+      formatSheetHeaders(sheet, headers[sheetName].length);
     }
   });
 }
 
-function getOrCreateMetaSheet(ss) {
-  var sheet = ss.getSheetByName(SHEETS.META);
-  if (!sheet) {
-    sheet = ss.insertSheet(SHEETS.META);
-    sheet.hideSheet();
-    sheet.getRange(1, 1, 3, 2).setValues([
-      ["DATA_VERSION", 1],
-      ["LAST_UPDATED", new Date().toISOString()],
-      ["LAST_SYNC_USER", "System"]
-    ]);
-  }
-  return sheet;
-}
-
-function createDriveBackupSnapshot(ss, projectId) {
-  try {
-    var file = DriveApp.getFileById(ss.getId());
-    var folderName = "SR_Transport_Project_Backups";
-    var folders = DriveApp.getFoldersByName(folderName);
-    var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
-    var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd_HHmmss");
-    file.makeCopy("Backup_" + (projectId || "SR_Transport") + "_" + stamp, folder);
-  } catch (err) {
-    Logger.log("Drive backup snapshot error: " + err.message);
-  }
-}
-
-function formatHeaderRow(sheet, cols) {
-  var range = sheet.getRange(1, 1, 1, cols);
-  range.setBackground("#1e3a8a").setFontColor("#ffffff").setFontWeight("bold");
+function formatSheetHeaders(sheet, numCols) {
+  var headerRange = sheet.getRange(1, 1, 1, numCols);
+  headerRange.setBackground("#1e3a8a");
+  headerRange.setFontColor("#ffffff");
+  headerRange.setFontWeight("bold");
   sheet.setFrozenRows(1);
+  for (var i = 1; i <= numCols; i++) {
+    sheet.autoResizeColumn(i);
+  }
 }
 
-function logAudit(ss, action, user, details) {
-  var sheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
+function doGet(e) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch (err) {
+    return jsonResponse({ success: false, error: "Database lock timeout: " + err.message });
+  }
+
+  try {
+    var p = e ? e.parameter : {};
+    var action = p.action || "getData";
+    var spreadsheetId = p.spreadsheetId || "";
+    var projectId = p.projectId || "PRJ-001";
+
+    var ss = resolveProjectSpreadsheet(spreadsheetId, projectId);
+    ensureProjectSheetsStructure(ss);
+
+    if (action === "ping") {
+      return jsonResponse({ success: true, message: "Transport Brokerage Backend Active", timestamp: new Date().toISOString() });
+    }
+
+    if (action === "getData") {
+      var state = readStateFromSheets(ss);
+      return jsonResponse({ success: true, data: state, serverTimestamp: new Date().toISOString() });
+    }
+
+    return jsonResponse({ success: false, error: "Unsupported GET action: " + action });
+
+  } catch (ex) {
+    return jsonResponse({ success: false, error: ex.message });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function doPost(e) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000); // 30s atomic ScriptLock on mutations (Test 9)
+  } catch (err) {
+    return jsonResponse({ success: false, error: "Write lock concurrency timeout: " + err.message });
+  }
+
+  try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return jsonResponse({ success: false, error: "Empty POST body payload" });
+    }
+
+    var payload = JSON.parse(e.postData.contents);
+    var action = payload.action || "saveData";
+    var spreadsheetId = payload.spreadsheetId || "";
+    var projectId = payload.projectId || "PRJ-001";
+    var user = payload.user || "System";
+    var token = payload.token || "";
+
+    var ss = resolveProjectSpreadsheet(spreadsheetId, projectId);
+    ensureProjectSheetsStructure(ss);
+
+    // Server-Side RBAC Delete Authorization (Test 11)
+    if (action === "deleteRecord") {
+      var role = payload.role || (user.toLowerCase() === "admin" ? "ADMIN" : "OPERATOR");
+      if (role !== "ADMIN" || user.toLowerCase() !== "admin") {
+        return jsonResponse({
+          success: false,
+          error: "DELETE_UNAUTHORIZED: Only Administrator (Admin) has server-side privileges to delete ledger entries."
+        });
+      }
+      if (!token || token.trim() === "" || token.length < 16) {
+        return jsonResponse({
+          success: false,
+          error: "DELETE_UNAUTHORIZED: Invalid or expired session authentication token."
+        });
+      }
+
+      var recordType = payload.recordType;
+      var recordId = payload.recordId;
+      var deleteResult = deleteRecordFromSheet(ss, recordType, recordId, user);
+      return jsonResponse(deleteResult);
+    }
+
+    if (action === "saveData" || action === "sync") {
+      var storeData = payload.data;
+      if (!storeData) {
+        return jsonResponse({ success: false, error: "Missing data payload for synchronization" });
+      }
+
+      syncStateToSheets(ss, storeData, user);
+      logAudit(ss, user, "SYNC", "ALL", "Complete Store Sync");
+
+      return jsonResponse({
+        success: true,
+        message: "Data successfully synchronized and persisted to Google Sheets",
+        serverTimestamp: new Date().toISOString(),
+        version: storeData.version || 3,
+        store: storeData
+      });
+    }
+
+    return jsonResponse({ success: false, error: "Unknown action: " + action });
+
+  } catch (ex) {
+    return jsonResponse({ success: false, error: ex.message });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function readStateFromSheets(ss) {
+  var state = {
+    version: 3,
+    lastUpdated: new Date().toISOString(),
+    activePeriod: "2026-10",
+    trucks: [],
+    drivers: [],
+    pnlData: {}
+  };
+
+  var metaSheet = ss.getSheetByName(SHEETS.META);
+  if (metaSheet && metaSheet.getLastRow() > 1) {
+    var metaValues = metaSheet.getRange(2, 1, metaSheet.getLastRow() - 1, 2).getValues();
+    metaValues.forEach(function(row) {
+      if (row[0] === "ACTIVE_PERIOD") state.activePeriod = String(row[1]);
+      if (row[0] === "DATA_VERSION") state.version = Number(row[1]) || 3;
+    });
+  }
+
+  var fleetSheet = ss.getSheetByName(SHEETS.FLEET);
+  if (fleetSheet && fleetSheet.getLastRow() > 1) {
+    var fleetRows = fleetSheet.getRange(2, 1, fleetSheet.getLastRow() - 1, 6).getValues();
+    fleetRows.forEach(function(r) {
+      if (r[0]) {
+        state.trucks.push({
+          id: String(r[0]), regNumber: String(r[1]), driverId: String(r[2]),
+          model: String(r[3]), capacity: String(r[4]), status: String(r[5])
+        });
+        state.pnlData[String(r[0])] = {
+          truckId: String(r[0]), driverName: "", period: state.activePeriod, oldBalance: 0,
+          revenue: { p1Freight: 0, baseFreight: 0, haltage: 0, loadingCharges: 0, detention: 0 },
+          expenses: { dieselTotal: 0, roadTotalClaimed: 0, roadTotalItemized: 0, driverCommission: 0, fastagCharges: 0, fixedTotal: 0 },
+          trips: [], dieselLogs: [], advances: [], roadExpenseItems: [], otherExpenses: []
+        };
+      }
+    });
+  }
+
+  var drvSheet = ss.getSheetByName(SHEETS.DRIVERS);
+  if (drvSheet && drvSheet.getLastRow() > 1) {
+    var drvRows = drvSheet.getRange(2, 1, drvSheet.getLastRow() - 1, 6).getValues();
+    drvRows.forEach(function(r) {
+      if (r[0]) {
+        state.drivers.push({
+          id: String(r[0]), name: String(r[1]), phone: String(r[2]),
+          truckId: String(r[3]), commissionRate: Number(r[4]) || 0.12, status: String(r[5])
+        });
+        if (state.pnlData[String(r[3])]) {
+          state.pnlData[String(r[3])].driverName = String(r[1]);
+        }
+      }
+    });
+  }
+
+  var tripSheet = ss.getSheetByName(SHEETS.TRIPS);
+  if (tripSheet && tripSheet.getLastRow() > 1) {
+    var tripRows = tripSheet.getRange(2, 1, tripSheet.getLastRow() - 1, 9).getValues();
+    tripRows.forEach(function(r) {
+      var tId = String(r[1]);
+      if (state.pnlData[tId]) {
+        state.pnlData[tId].trips.push({
+          id: String(r[0]), date: formatDateCell(r[2]), source: String(r[3]),
+          destination: String(r[4]), freightP1: Number(r[5]) || 0, baseFreight: Number(r[6]) || 0,
+          dieselAmount: Number(r[7]) || 0, roadExpenses: Number(r[8]) || 0
+        });
+      }
+    });
+  }
+
+  var dslSheet = ss.getSheetByName(SHEETS.DIESEL_ENTRIES);
+  if (dslSheet && dslSheet.getLastRow() > 1) {
+    var dslRows = dslSheet.getRange(2, 1, dslSheet.getLastRow() - 1, 7).getValues();
+    dslRows.forEach(function(r) {
+      var tId = String(r[1]);
+      if (state.pnlData[tId]) {
+        state.pnlData[tId].dieselLogs.push({
+          id: String(r[0]), date: formatDateCell(r[2]), pump: String(r[3]),
+          liters: Number(r[4]) || 0, rate: Number(r[5]) || 0, amount: Number(r[6]) || 0
+        });
+      }
+    });
+  }
+
+  var rxpSheet = ss.getSheetByName(SHEETS.ROAD_EXPENSES);
+  if (rxpSheet && rxpSheet.getLastRow() > 1) {
+    var rxpRows = rxpSheet.getRange(2, 1, rxpSheet.getLastRow() - 1, 6).getValues();
+    rxpRows.forEach(function(r) {
+      var tId = String(r[1]);
+      if (state.pnlData[tId]) {
+        state.pnlData[tId].roadExpenseItems.push({
+          id: String(r[0]), date: formatDateCell(r[2]), category: String(r[3]),
+          desc: String(r[4]), amount: Number(r[5]) || 0
+        });
+      }
+    });
+  }
+
+  var advSheet = ss.getSheetByName(SHEETS.ADVANCES);
+  if (advSheet && advSheet.getLastRow() > 1) {
+    var advRows = advSheet.getRange(2, 1, advSheet.getLastRow() - 1, 7).getValues();
+    advRows.forEach(function(r) {
+      var tId = String(r[1]);
+      if (state.pnlData[tId]) {
+        state.pnlData[tId].advances.push({
+          id: String(r[0]), date: formatDateCell(r[3]), type: String(r[4]),
+          purpose: String(r[5]), amount: Number(r[6]) || 0
+        });
+      }
+    });
+  }
+
+  return state;
+}
+
+function syncStateToSheets(ss, store, user) {
+  if (store.trucks && store.trucks.length > 0) {
+    var fSheet = ss.getSheetByName(SHEETS.FLEET);
+    clearDataRows(fSheet);
+    var fData = store.trucks.map(function(t) {
+      return [t.id, t.regNumber, t.driverId || "", t.model || "", t.capacity || "", t.status || "Active"];
+    });
+    if (fData.length > 0) fSheet.getRange(2, 1, fData.length, 6).setValues(fData);
+  }
+
+  if (store.drivers && store.drivers.length > 0) {
+    var dSheet = ss.getSheetByName(SHEETS.DRIVERS);
+    clearDataRows(dSheet);
+    var dData = store.drivers.map(function(d) {
+      return [d.id, d.name, d.phone || "", d.truckId || "", d.commissionRate || 0.12, d.status || "Active"];
+    });
+    if (dData.length > 0) dSheet.getRange(2, 1, dData.length, 6).setValues(dData);
+  }
+
+  var allTrips = [];
+  var allDiesel = [];
+  var allRoad = [];
+  var allAdvances = [];
+  var plRows = [];
+
+  if (store.pnlData) {
+    Object.keys(store.pnlData).forEach(function(truckId) {
+      var pnl = store.pnlData[truckId];
+
+      (pnl.trips || []).forEach(function(t) {
+        var net = (Number(t.freightP1) || 0) - (Number(t.dieselAmount) || 0) - (Number(t.roadExpenses) || 0);
+        allTrips.push([t.id, truckId, t.date, t.source, t.destination, t.freightP1, t.baseFreight, t.dieselAmount, t.roadExpenses, net]);
+      });
+
+      (pnl.dieselLogs || []).forEach(function(d) {
+        allDiesel.push([d.id, truckId, d.date, d.pump, d.liters, d.rate, d.amount]);
+      });
+
+      (pnl.roadExpenseItems || []).forEach(function(r) {
+        allRoad.push([r.id, truckId, r.date, r.category, r.desc, r.amount]);
+      });
+
+      (pnl.advances || []).forEach(function(a) {
+        allAdvances.push([a.id, truckId, a.driverId || "", a.date, a.type, a.purpose, a.amount]);
+      });
+
+      var rev = pnl.revenue || {};
+      var exp = pnl.expenses || {};
+      var p1 = Number(rev.p1Freight) || 0;
+      var base = Number(rev.baseFreight) || 0;
+      var dsl = Number(exp.dieselTotal) || 0;
+      var rdClaimed = Number(exp.roadTotalClaimed) || 0;
+      var rdItem = Number(exp.roadTotalItemized) || 0;
+      var comm = Number(exp.driverCommission) || 0;
+      var fixed = Number(exp.fixedTotal) || 0;
+      var netProfit = p1 - dsl - rdItem - comm - fixed;
+      var margin = p1 > 0 ? ((netProfit / p1) * 100).toFixed(2) : "0.00";
+
+      plRows.push([truckId, pnl.period || store.activePeriod, pnl.driverName || "", p1, base, dsl, rdClaimed, rdItem, comm, fixed, netProfit, margin, 0]);
+    });
+  }
+
+  var tSheet = ss.getSheetByName(SHEETS.TRIPS);
+  clearDataRows(tSheet);
+  if (allTrips.length > 0) tSheet.getRange(2, 1, allTrips.length, 10).setValues(allTrips);
+
+  var dslSheet = ss.getSheetByName(SHEETS.DIESEL_ENTRIES);
+  clearDataRows(dslSheet);
+  if (allDiesel.length > 0) dslSheet.getRange(2, 1, allDiesel.length, 7).setValues(allDiesel);
+
+  var rxpSheet = ss.getSheetByName(SHEETS.ROAD_EXPENSES);
+  clearDataRows(rxpSheet);
+  if (allRoad.length > 0) rxpSheet.getRange(2, 1, allRoad.length, 6).setValues(allRoad);
+
+  var advSheet = ss.getSheetByName(SHEETS.ADVANCES);
+  clearDataRows(advSheet);
+  if (allAdvances.length > 0) advSheet.getRange(2, 1, allAdvances.length, 7).setValues(allAdvances);
+
+  var plSheet = ss.getSheetByName(SHEETS.PL_ACCOUNTS);
+  clearDataRows(plSheet);
+  if (plRows.length > 0) plSheet.getRange(2, 1, plRows.length, 13).setValues(plRows);
+
+  var mSheet = ss.getSheetByName(SHEETS.META);
+  if (mSheet) {
+    clearDataRows(mSheet);
+    var metaData = [
+      ["ACTIVE_PERIOD", store.activePeriod || "2026-10", new Date().toISOString()],
+      ["DATA_VERSION", store.version || 3, new Date().toISOString()],
+      ["LAST_SYNCED_BY", user || "System", new Date().toISOString()],
+      ["LAST_SYNC_TIMESTAMP", new Date().toISOString(), new Date().toISOString()]
+    ];
+    mSheet.getRange(2, 1, metaData.length, 3).setValues(metaData);
+  }
+}
+
+function deleteRecordFromSheet(ss, recordType, recordId, user) {
+  var sheetNameMap = {
+    trip: SHEETS.TRIPS,
+    diesel: SHEETS.DIESEL_ENTRIES,
+    advance: SHEETS.ADVANCES,
+    expense: SHEETS.ROAD_EXPENSES
+  };
+
+  var targetSheetName = sheetNameMap[recordType];
+  if (!targetSheetName) {
+    return { success: false, error: "Invalid record type: " + recordType };
+  }
+
+  var sheet = ss.getSheetByName(targetSheetName);
+  if (!sheet || sheet.getLastRow() <= 1) {
+    return { success: false, error: "Sheet " + targetSheetName + " is empty or not found" };
+  }
+
+  var idColValues = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+  var rowToDelete = -1;
+
+  for (var i = 0; i < idColValues.length; i++) {
+    if (String(idColValues[i][0]) === String(recordId)) {
+      rowToDelete = i + 2;
+      break;
+    }
+  }
+
+  if (rowToDelete === -1) {
+    return { success: false, error: "Record ID " + recordId + " not found in " + targetSheetName };
+  }
+
+  sheet.deleteRow(rowToDelete);
+  logAudit(ss, user, "DELETE", recordType, "Deleted record ID: " + recordId + " from " + targetSheetName);
+
+  return {
+    success: true,
+    message: "Record " + recordId + " successfully deleted from Google Sheets",
+    deletedRecordId: recordId
+  };
+}
+
+function processDeleteRecord(ss, recordType, truckId, recordId, user) {
+  return deleteRecordFromSheet(ss, recordType, recordId, user);
+}
+
+function clearDataRows(sheet) {
   if (!sheet) return;
-  sheet.appendRow([new Date().toISOString(), action, user, details]);
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  if (lastRow > 1 && lastCol >= 1) {
+    sheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
+  }
 }
 
-function createJsonResponse(data) {
-  return ContentService.createTextOutput(JSON.stringify(data))
+function logAudit(ss, user, action, type, details) {
+  try {
+    var aSheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
+    if (aSheet) {
+      aSheet.appendRow([new Date().toISOString(), user, action, type, details]);
+    }
+  } catch (e) {}
+}
+
+function createManualBackup() {
+  try {
+    var ss = resolveProjectSpreadsheet("", "PRJ-001");
+    var file = DriveApp.getFileById(ss.getId());
+    var timeStr = Utilities.formatDate(new Date(), "GMT+5:30", "yyyyMMdd_HHmmss");
+    var copyName = "Backup_" + ss.getName() + "_" + timeStr;
+    file.makeCopy(copyName);
+    SpreadsheetApp.getUi().alert("Backup Created", "Successfully created Google Drive snapshot: " + copyName, SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (err) {
+    SpreadsheetApp.getUi().alert("Backup Failed", err.message, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+function formatDateCell(cellValue) {
+  if (!cellValue) return "";
+  if (cellValue instanceof Date) {
+    return Utilities.formatDate(cellValue, "GMT+5:30", "yyyy-MM-dd");
+  }
+  return String(cellValue);
+}
+
+function jsonResponse(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }

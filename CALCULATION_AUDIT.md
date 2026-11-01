@@ -113,3 +113,17 @@ $$\text{Net Settlement} = \text{Credits} - \text{Debits}$$
   $$\text{Net} = ₹62,340 + ₹5,830 = \mathbf{₹68,170}$$
   **Direction:** Driver Allam Brother pays Transporter Shankar **₹68,170**.
 
+---
+
+### 2.4 Investigation & Mathematical Resolution of the ₹1,660 Discrepancy
+- **Audit Observation:** Certain draft project notes noted a potential ₹1,660 discrepancy between ₹68,170 and ₹66,510.
+- **Master Workbook Proof:** Inspection of `X/Truck_Detials_1122_6666_Drivers.xlsx` (Rows 53 to 69) reveals:
+  - Row 56: Base freight eligible for commission: ₹10,000 + ₹1,14,000 + ₹75,000 = ₹1,99,000. Driver commission at 12%: `=SUM(M53:M55)*12% = 23,880`.
+  - Row 64: Advances: `=SUM(H58:H63) = 41,500` (₹2,500 + ₹5,000 + ₹5,000 + ₹20,000 + ₹5,000 + ₹4,000).
+  - Row 65: Itemized Road Expenses: `11,790`.
+  - Row 66: Commission: `23,880`.
+  - Row 67: Current Net Deficit: `=H64-H65-H66 = 41,500 - 11,790 - 23,880 = 5,830`.
+  - Row 68: Prior Outstanding Debt Owed by Driver: `62,340`.
+  - Row 69: Final Balance with Allam: `=H67+H68 = 5,830 + 62,340 = 68,170` (Explicit formula in cell H69: "As On Date 20-10-2026, Allam wants to Pay Shankar: 68,170").
+- **Resolution:** The ₹1,660 discrepancy was a phantom arithmetic error in external notes. The master Excel formula is `=H67+H68`, yielding exactly **₹68,170**, which matches the application calculations with 100% precision.
+

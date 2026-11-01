@@ -199,12 +199,25 @@ Assert-Test "Authoritative Master Data Parity" (
 # 21. Admin-Only Cloud Links & Settings Protection Verification
 Assert-Test "Admin-Only Settings Modal & Cloud Links Protection" (
     $apiContent.Contains("AKfycbwREdyxaW64mixcHfFNyspj_KD_jxYYryQWjRukjPiBxdjkNoG0tguD0vaPW0n0cMcinQ") -and
+    $apiContent.Contains("1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4") -and
+    (!$apiContent.Contains("1l4GkXJ-eiX-SzyeGlfBMWc-H32sE2ubeNnq_LDEDXqMtYhU6b4Zls8bL")) -and
     $htmlContent.Contains("settingsModal"" class=""app-modal-overlay admin-only""") -and
-    $htmlContent.Contains("1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4") -and
-    $htmlContent.Contains("1l4GkXJ-eiX-SzyeGlfBMWc-H32sE2ubeNnq_LDEDXqMtYhU6b4Zls8bL") -and
     $appContent.Contains("Access Denied: Only Administrator (Admin) can view and configure cloud spreadsheet settings") -and
     $apiContent.Contains("Access Denied: Only Administrator (Admin) can access the raw Google Spreadsheet")
 ) "System must protect live spreadsheet settings and links so only Admin can access them."
+
+# 22. Enterprise Workspace Suite & View Screens Verification
+Assert-Test "Enterprise Workspace Suite (Fleet, Trips, Expenses, Reports)" (
+    $tableContent.Contains("renderFleetView") -and
+    $tableContent.Contains("renderTripsView") -and
+    $tableContent.Contains("renderExpensesView") -and
+    $tableContent.Contains("renderReportsView") -and
+    $htmlContent.Contains("id=""view-fleet""") -and
+    $htmlContent.Contains("id=""view-trips""") -and
+    $htmlContent.Contains("id=""view-expenses""") -and
+    $htmlContent.Contains("id=""view-reports""") -and
+    $appContent.Contains("VIEW_MAP")
+) "System must provide complete enterprise screens for Fleet, Trips, Expenses, and Reports."
 
 Write-Host "`n==========================================================" -ForegroundColor Cyan
 Write-Host "RESULT: $passedTests / $totalTests TESTS PASSED" -ForegroundColor $(if ($passedTests -eq $totalTests) { "Green" } else { "Red" })

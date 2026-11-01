@@ -1,258 +1,245 @@
 /**
  * Transport Brokerage Ledger Pvt Ltd
- * Multi-Project Cloud API, Verification & Realtime Synchronization (P2)
+ * API & Cloud Synchronization Module (api.js)
+ *
+ * Dedicated Production Google Spreadsheet:
+ * https://docs.google.com/spreadsheets/d/1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4/edit?usp=sharing
+ *
+ * Web App Endpoint:
+ * https://script.google.com/macros/s/AKfycbwREdyxaW64mixcHfFNyspj_KD_jxYYryQWjRukjPiBxdjkNoG0tguD0vaPW0n0cMcinQ/exec
  */
 
-const ApiModule = (function () {
-  'use strict';
+const ApiModule = (() => {
+  const CONFIG = {
+    SPREADSHEET_ID: "1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4",
+    GAS_URL: "https://script.google.com/macros/s/AKfycbwREdyxaW64mixcHfFNyspj_KD_jxYYryQWjRukjPiBxdjkNoG0tguD0vaPW0n0cMcinQ/exec",
+    DEPLOYMENT_ID: "AKfycbwREdyxaW64mixcHfFNyspj_KD_jxYYryQWjRukjPiBxdjkNoG0tguD0vaPW0n0cMcinQ",
+    SYNC_INTERVAL_MS: 300000,
+    REQUEST_TIMEOUT_MS: 20000
+  };
 
-  const GAS_URL_KEY = 'FLEET_LEDGER_P2_GAS_ENDPOINT';
-  const DATA_VERSION_KEY = 'FLEET_LEDGER_P2_DATA_VERSION';
-  const DEFAULT_SPREADSHEET_ID = '1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4';
-  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwREdyxaW64mixcHfFNyspj_KD_jxYYryQWjRukjPiBxdjkNoG0tguD0vaPW0n0cMcinQ/exec';
-  const SCRIPT_PROJECT_URL = 'https://script.google.com/u/0/home/projects/1l4GkXJ-eiX-SzyeGlfBMWc-H32sE2ubeNnq_LDEDXqMtYhU6b4Zls8bL/edit';
-
-  let currentSyncStatus = 'ONLINE_READY'; // 'SYNCING', 'SYNCED', 'OFFLINE', 'FAILED', 'CONFLICT'
-  let syncTimer = null;
-  let isSyncing = false;
-
-  // Real-time Cross-Tab Synchronization via BroadcastChannel
-  const syncChannel = (typeof window !== 'undefined' && typeof window.BroadcastChannel !== 'undefined')
-    ? new BroadcastChannel('sr_transport_sync_channel_v2')
+  const syncChannel = ('BroadcastChannel' in window)
+    ? new BroadcastChannel('sr_transport_sync_channel')
     : null;
 
-  if (syncChannel) {
-    syncChannel.onmessage = function (event) {
-      if (event && event.data) {
-        console.log('[SyncChannel] Cross-tab event received:', event.data);
-        if (typeof AppModule !== 'undefined' && typeof AppModule.renderCurrentView === 'function') {
-          AppModule.renderCurrentView();
+  function initCrossTabSync(onRemoteUpdate) {
+    if (!syncChannel) return;
+    syncChannel.onmessage = (event) => {
+      const msg = event.data;
+      if (msg && msg.type === 'DATA_UPDATED') {
+        DataModule.loadStateFromStorage();
+        if (typeof onRemoteUpdate === 'function') {
+          onRemoteUpdate(msg);
         }
       }
     };
   }
 
-  function getEndpoint() {
-    const stored = localStorage.getItem(GAS_URL_KEY);
-    if (stored && stored.includes('AKfycbxhwvJi8UDsJd2yFo9oprDAQGS8M9L6UfcM5M9Tmn98UPZFP8ijYdS9ZIYAl4hiyKbopA')) {
-      localStorage.setItem(GAS_URL_KEY, DEFAULT_GAS_URL);
-      return DEFAULT_GAS_URL;
+  function broadcastLocalChange(source) {
+    if (!syncChannel) return;
+    syncChannel.postMessage({
+      type: 'DATA_UPDATED',
+      source: source || 'local_mutation',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  function updateStatusBadge(status, label) {
+    const dot = document.getElementById('cloudStatusDot') || document.getElementById('cloud-dot');
+    const text = document.getElementById('cloudStatusText') || document.getElementById('cloud-status');
+    if (dot) {
+      dot.className = 'status-dot ' + status;
     }
-    return stored || DEFAULT_GAS_URL;
-  }
-
-  function setEndpoint(url) {
-    if (url) {
-      localStorage.setItem(GAS_URL_KEY, url.trim());
-    } else {
-      localStorage.removeItem(GAS_URL_KEY);
-    }
-  }
-
-  function getDataVersion() {
-    return parseInt(localStorage.getItem(DATA_VERSION_KEY) || '1', 10);
-  }
-
-  function incrementDataVersion() {
-    const nextVer = getDataVersion() + 1;
-    localStorage.setItem(DATA_VERSION_KEY, String(nextVer));
-    return nextVer;
-  }
-
-  function broadcastLocalChange(data) {
-    const newVersion = incrementDataVersion();
-    if (syncChannel) {
-      try {
-        syncChannel.postMessage({
-          type: 'LOCAL_MUTATION',
-          version: newVersion,
-          timestamp: Date.now()
-        });
-      } catch (e) {
-        console.warn('BroadcastChannel error:', e);
-      }
+    if (text) {
+      text.textContent = label;
     }
   }
 
-  function getProjectSpreadsheetId() {
-    const prj = DataModule.getCurrentProject();
-    return (prj && prj.spreadsheetId && prj.spreadsheetId.trim() !== '') ? prj.spreadsheetId.trim() : DEFAULT_SPREADSHEET_ID;
-  }
-
-  function setProjectSpreadsheetId(id) {
-    const prj = DataModule.getCurrentProject();
-    if (prj) {
-      DataModule.updateProject(prj.id, { spreadsheetId: (id || '').trim() });
+  async function fetchWithTimeout(url, options = {}) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), CONFIG.REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(id);
+      return response;
+    } catch (err) {
+      clearTimeout(id);
+      throw err;
     }
   }
 
-  function openGoogleSheet() {
-    if (typeof AuthModule !== 'undefined' && typeof AuthModule.isAdmin === 'function' && !AuthModule.isAdmin()) {
-      alert("Access Denied: Only Administrator (Admin) can access the raw Google Spreadsheet.");
-      return;
-    }
-    const sheetId = getProjectSpreadsheetId();
-    if (sheetId && sheetId !== "" && !sheetId.includes("placeholder")) {
-      window.open('https://docs.google.com/spreadsheets/d/' + sheetId + '/edit', '_blank');
-    } else {
-      window.open('https://docs.google.com/spreadsheets/d/' + DEFAULT_SPREADSHEET_ID + '/edit?usp=sharing', '_blank');
-    }
-  }
+  // Bidirectional Cloud Sync Reconciliation (Test 12)
+  async function syncLedgerData(customStore) {
+    updateStatusBadge('syncing', 'Syncing...');
+    const storeData = customStore || DataModule.getStore();
+    const activeProject = DataModule.getActiveProject();
+    const targetSpreadsheetId = (activeProject && activeProject.spreadsheetId)
+      ? activeProject.spreadsheetId
+      : CONFIG.SPREADSHEET_ID;
 
-  function openScriptProject() {
-    if (typeof AuthModule !== 'undefined' && typeof AuthModule.isAdmin === 'function' && !AuthModule.isAdmin()) {
-      alert("Access Denied: Only Administrator (Admin) can access the Google Apps Script project.");
-      return;
-    }
-    window.open(SCRIPT_PROJECT_URL, '_blank');
-  }
-
-  function updateStatusBadge(status, text) {
-    currentSyncStatus = status;
-    const badge = document.getElementById('headerCloudSyncBadge');
-    if (!badge) return;
-
-    badge.className = 'header-sync-pill';
-    if (status === 'SYNCING') {
-      badge.classList.add('syncing');
-      badge.innerHTML = '🔄 Syncing...';
-      badge.title = 'Synchronizing with cloud spreadsheet...';
-    } else if (status === 'SYNCED') {
-      badge.classList.add('synced');
-      badge.innerHTML = '🟢 Synced (v' + getDataVersion() + ')';
-      badge.title = 'All records successfully persisted and verified in cloud.';
-    } else if (status === 'OFFLINE') {
-      badge.classList.add('offline');
-      badge.innerHTML = '⚪ Offline Mode';
-      badge.title = 'Running locally in browser LocalStorage.';
-    } else if (status === 'FAILED') {
-      badge.classList.add('error');
-      badge.innerHTML = '🔴 Sync Error';
-      badge.title = text || 'Cloud synchronization failed. Check Apps Script endpoint.';
-    } else {
-      badge.innerHTML = '🟢 Cloud Ready';
-    }
-  }
-
-  /**
-   * Real Bidirectional Sync:
-   * Pushes full project store, receives server reconciliation, merges and updates local store
-   */
-  async function syncNow() {
-    if (isSyncing) return;
-    isSyncing = true;
-    updateStatusBadge('SYNCING');
-
-    const url = getEndpoint();
-    const curUser = AuthModule.getCurrentUser();
-    const activeProject = DataModule.getCurrentProject();
-
-    if (!url || url.trim() === '') {
-      updateStatusBadge('OFFLINE', 'No Apps Script Web App URL configured.');
-      isSyncing = false;
-      return { success: false, offline: true, message: 'Running in offline mode (no endpoint configured).' };
-    }
+    const payload = {
+      action: 'saveData',
+      projectId: activeProject ? activeProject.id : 'PRJ-001',
+      spreadsheetId: targetSpreadsheetId,
+      user: (typeof AuthModule !== 'undefined' && AuthModule.getCurrentUser())
+        ? AuthModule.getCurrentUser().username
+        : 'Operator',
+      data: storeData
+    };
 
     try {
-      const payload = {
-        action: 'syncLedgerData',
-        projectId: activeProject.id,
-        spreadsheetId: activeProject.spreadsheetId || '',
-        version: getDataVersion(),
-        user: curUser ? curUser.username : 'Anonymous',
-        role: curUser ? curUser.role : 'USER',
-        sessionToken: curUser ? curUser.token : '',
-        timestamp: new Date().toISOString(),
-        store: DataModule.getStore()
-      };
-
-      const response = await fetch(url, {
+      const resp = await fetchWithTimeout(CONFIG.GAS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(payload)
       });
 
-      if (!response.ok) {
-        throw new Error('HTTP ' + response.status + ' ' + response.statusText);
-      }
-
-      const result = await response.json();
+      if (!resp.ok) throw new Error(`HTTP error ${resp.status}`);
+      const resJson = await resp.json();
+      const result = resJson;
 
       if (result.success) {
-        // Apply reconciled data from server if provided
-        if (result.store && result.store.projects) {
+        // If server sent back updated store, save it to DataModule
+        if (result.store) {
           DataModule.saveStore(result.store);
         }
-        if (result.version) {
-          localStorage.setItem(DATA_VERSION_KEY, String(result.version));
-        }
-        updateStatusBadge('SYNCED');
-        if (typeof AppModule !== 'undefined' && typeof AppModule.showToast === 'function') {
-          AppModule.showToast('🟢 Cloud ledger successfully synchronized and verified!', 'success');
-        }
-        isSyncing = false;
-        return { success: true, version: result.version };
+        updateStatusBadge('online', 'Synced');
+        broadcastLocalChange('cloud_sync');
+        return { success: true, timestamp: resJson.serverTimestamp || new Date().toISOString() };
       } else {
-        updateStatusBadge('FAILED', result.message || result.error);
-        if (typeof AppModule !== 'undefined' && typeof AppModule.showToast === 'function') {
-          AppModule.showToast('⚠️ Cloud Sync: ' + (result.message || result.error), 'error');
-        }
-        isSyncing = false;
-        return { success: false, error: result.error, message: result.message };
+        updateStatusBadge('offline', 'Sync Error');
+        return { success: false, error: resJson.error || 'Server error' };
       }
-
     } catch (err) {
-      console.warn('Sync error:', err);
-      updateStatusBadge('FAILED', err.message);
-      if (typeof AppModule !== 'undefined' && typeof AppModule.showToast === 'function') {
-        AppModule.showToast('🔴 Network error during cloud sync: ' + err.message, 'error');
+      updateStatusBadge('offline', 'Offline');
+      return { success: false, error: err.message, offlineFallback: true };
+    }
+  }
+
+  async function syncWithServer(storeData, options = {}) {
+    return syncLedgerData(storeData);
+  }
+
+  async function pullFromServer() {
+    updateStatusBadge('syncing', 'Fetching...');
+    const activeProject = DataModule.getActiveProject();
+    const targetSpreadsheetId = (activeProject && activeProject.spreadsheetId)
+      ? activeProject.spreadsheetId
+      : CONFIG.SPREADSHEET_ID;
+
+    const url = `${CONFIG.GAS_URL}?action=getData&projectId=${encodeURIComponent(activeProject ? activeProject.id : 'PRJ-001')}&spreadsheetId=${encodeURIComponent(targetSpreadsheetId)}`;
+
+    try {
+      const resp = await fetchWithTimeout(url, { method: 'GET' });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const resJson = await resp.json();
+
+      if (resJson.success && resJson.data) {
+        DataModule.mergeRemoteState(resJson.data);
+        updateStatusBadge('online', 'Synced');
+        broadcastLocalChange('cloud_pull');
+        return { success: true, data: resJson.data };
       }
-      isSyncing = false;
+      updateStatusBadge('offline', 'Pull Error');
+      return { success: false, error: resJson.error || 'Invalid server payload' };
+    } catch (err) {
+      updateStatusBadge('offline', 'Offline');
       return { success: false, error: err.message };
     }
   }
 
+  async function deleteRecordOnServer(recordType, recordId) {
+    if (typeof AuthModule !== 'undefined' && !AuthModule.isAdmin()) {
+      return { success: false, error: "Access Denied: Operators cannot delete records." };
+    }
+
+    const currentUser = (typeof AuthModule !== 'undefined') ? AuthModule.getCurrentUser() : null;
+    const sessionToken = (typeof AuthModule !== 'undefined') ? AuthModule.getSessionToken() : '';
+
+    const payload = {
+      action: 'deleteRecord',
+      recordType: recordType,
+      recordId: recordId,
+      user: currentUser ? currentUser.username : 'admin',
+      token: sessionToken,
+      spreadsheetId: CONFIG.SPREADSHEET_ID
+    };
+
+    try {
+      const resp = await fetchWithTimeout(CONFIG.GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+      return await resp.json();
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  function getSpreadsheetUrl() {
+    if (typeof AuthModule !== 'undefined' && !AuthModule.isAdmin()) {
+      throw new Error("Access Denied: Only Administrator (Admin) can access the raw Google Spreadsheet.");
+    }
+    const activeProject = DataModule.getActiveProject();
+    const sheetId = (activeProject && activeProject.spreadsheetId)
+      ? activeProject.spreadsheetId
+      : CONFIG.SPREADSHEET_ID;
+    return `https://docs.google.com/spreadsheets/d/${sheetId}/edit?usp=sharing`;
+  }
+
+  function openGoogleSheet() {
+    try {
+      const url = getSpreadsheetUrl();
+      window.open(url, '_blank');
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  function getConfig() {
+    if (typeof AuthModule !== 'undefined' && !AuthModule.isAdmin()) {
+      return {
+        GAS_URL: CONFIG.GAS_URL,
+        DEPLOYMENT_ID: CONFIG.DEPLOYMENT_ID,
+        SYNC_INTERVAL_MS: CONFIG.SYNC_INTERVAL_MS
+      };
+    }
+    return { ...CONFIG };
+  }
+
+  function updateGasUrl(newUrl) {
+    if (typeof AuthModule !== 'undefined' && !AuthModule.isAdmin()) {
+      alert("Access Denied: Only Administrator can update API endpoints.");
+      return false;
+    }
+    if (newUrl && newUrl.startsWith("https://script.google.com/")) {
+      CONFIG.GAS_URL = newUrl.trim();
+      localStorage.setItem('sr_transport_gas_url', CONFIG.GAS_URL);
+      return true;
+    }
+    return false;
+  }
+
   function escapeHtml(str) {
-    if (str === null || str === undefined) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  function escapeAttr(str) {
-    return escapeHtml(str);
-  }
-
-  function parseAmount(val) {
-    if (typeof val === 'number') return isNaN(val) ? 0 : val;
-    if (!val) return 0;
-    const clean = String(val).replace(/[^0-9.-]/g, '');
-    const num = parseFloat(clean);
-    return isNaN(num) ? 0 : num;
+    if (typeof str !== 'string') return str;
+    return str.replace(/[&<>'"]/g, tag => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    }[tag] || tag));
   }
 
   return {
-    getEndpoint,
-    setEndpoint,
-    getProjectSpreadsheetId,
-    setProjectSpreadsheetId,
-    openGoogleSheet,
-    openScriptProject,
-    getScriptProjectUrl: function () { return SCRIPT_PROJECT_URL; },
-    getDataVersion,
-    incrementDataVersion,
+    initCrossTabSync,
     broadcastLocalChange,
-    syncNow,
     updateStatusBadge,
-    escapeHtml,
-    escapeAttr,
-    parseAmount
+    syncLedgerData,
+    syncWithServer,
+    pullFromServer,
+    deleteRecordOnServer,
+    getSpreadsheetUrl,
+    openGoogleSheet,
+    getConfig,
+    updateGasUrl,
+    escapeHtml
   };
 })();
-
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = ApiModule;
-}
