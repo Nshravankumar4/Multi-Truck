@@ -7,40 +7,23 @@ const AuthModule = (function () {
   'use strict';
 
   const AUTH_STORAGE_KEY = 'SR_TRANSPORT_AUTH_SESSION_V2';
-  const CREDENTIALS_STORAGE_KEY = 'SR_TRANSPORT_USER_CREDENTIALS_V3';
+  const CREDENTIALS_STORAGE_KEY = 'SR_TRANSPORT_USER_CREDENTIALS_V1';
   const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes (Test 17)
 
   const DEFAULT_USERS = {
     'Admin': {
       name: 'Shravan Kumar',
       role: 'ADMIN',
-      passHash: 'ded12726612993e58a7f6f1b0428300adcf13f6cabb7515436c5888b3de21c0b',
+      passHash: 'c7c8fc3d085957d6050a4ec970c672b1574895fa7b045e7f1e56b4f74d0e8081', // Shravan@2505
       permissions: ['read', 'write', 'edit', 'delete', 'export', 'backup', 'restore', 'settings', 'projects']
     },
     'Rudra': {
       name: 'Rudra (Operator)',
       role: 'USER',
-      passHash: '0a623bcaece42a5740cdfb0b78849ec8717d811c8c2583697ab884513f4d9e3f',
-      permissions: ['read', 'write', 'edit', 'export']
+      passHash: '52bf4225d3df6cbcf896be4fbaf2c27056c0733bb58c54117b355418bb6b9075', // RudraSarika@2505
+      permissions: ['read', 'write', 'edit', 'export'] // Delete, project management & Settings blocked
     }
   };
-
-  // Supported valid SHA-256 digests for Admin & Operator accounts
-  const ADMIN_VALID_HASHES = [
-    'ded12726612993e58a7f6f1b0428300adcf13f6cabb7515436c5888b3de21c0b', // Primary Admin password
-    '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', // admin
-    '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', // admin123
-    'e86f78a8a3caf0b60d8e74e5942aa6d86dc150cd3c03338aef25b7d2d7e3acc7', // Admin@123
-    '20221aef7b8199c90d84bfda6cabdcf13298824757d54615c275f8951d2692f5', // Shravan
-    'c7c8fc3d085957d6050a4ec970c672b1574895fa7b045e7f1e56b4f74d0e8081'  // legacy
-  ];
-
-  const RUDRA_VALID_HASHES = [
-    '0a623bcaece42a5740cdfb0b78849ec8717d811c8c2583697ab884513f4d9e3f', // Primary Rudra password
-    '22b81f2348ccf915cb5cedcd18cd6f31325ea62a804a608ae62ecd458e6c50cb', // rudra
-    'faec7023bcf087fe5dc0cfe00e1495263f52dc1802f681b55eb745ebe343779d', // rudra123
-    '52bf4225d3df6cbcf896be4fbaf2c27056c0733bb58c54117b355418bb6b9075'  // legacy
-  ];
 
   let inactivityTimer = null;
 
@@ -64,10 +47,7 @@ const AuthModule = (function () {
   function getUsers() {
     try {
       const raw = localStorage.getItem(CREDENTIALS_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && parsed.Admin && parsed.Rudra) return parsed;
-      }
+      if (raw) return JSON.parse(raw);
     } catch (e) {}
     localStorage.setItem(CREDENTIALS_STORAGE_KEY, JSON.stringify(DEFAULT_USERS));
     return DEFAULT_USERS;
@@ -78,48 +58,22 @@ const AuthModule = (function () {
   }
 
   async function login(username, plainPassword) {
-    const rawUser = String(username || '').trim();
-    const normalizedUser = (rawUser.toLowerCase() === 'rudra') ? 'Rudra' : 'Admin';
     const users = getUsers();
-    const user = users[normalizedUser] || DEFAULT_USERS[normalizedUser];
+    const user = users[username];
 
     if (!user) {
       return { success: false, message: 'Invalid username.' };
     }
 
-    const inputPwd = String(plainPassword || '').trim();
-    if (!inputPwd) {
-      return { success: false, message: 'Password is required.' };
+    const hashedInput = await sha256(plainPassword);
+    if (hashedInput !== user.passHash) {
+      return { success: false, message: 'Incorrect password for account ' + username + '.' };
     }
 
-    const hashedInput = await sha256(inputPwd);
-    const validHashes = (normalizedUser === 'Admin')
-      ? [user.passHash, ...ADMIN_VALID_HASHES]
-      : [user.passHash, ...RUDRA_VALID_HASHES];
-
-    // Direct plain-text matches support for offline / non-subtle crypto contexts
-    const isDirectMatch = (normalizedUser === 'Admin' && (
-      inputPwd === 'Shravan@2505' ||
-      inputPwd === 'admin' ||
-      inputPwd === 'admin123' ||
-      inputPwd === 'Admin@123' ||
-      inputPwd === 'Shravan' ||
-      inputPwd === '2505'
-    )) || (normalizedUser === 'Rudra' && (
-      inputPwd === 'RudraSarika@2505' ||
-      inputPwd === 'rudra' ||
-      inputPwd === 'rudra123' ||
-      inputPwd === 'Rudra@123'
-    ));
-
-    if (!validHashes.includes(hashedInput) && !isDirectMatch) {
-      return { success: false, message: 'Incorrect password for account ' + normalizedUser + '.' };
-    }
-
-    const token = 'SRT_' + normalizedUser + '_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+    const token = 'TOK_' + username + '_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
 
     const session = {
-      username: normalizedUser,
+      username: username,
       displayName: user.name,
       role: user.role,
       permissions: user.permissions,
@@ -278,19 +232,7 @@ const AuthModule = (function () {
       errBox.textContent = '';
     }
 
-    const submitBtn = document.getElementById('loginSubmitBtn');
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = '⏳ Authenticating...';
-    }
-
     const res = await login(username, password);
-
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.textContent = '🚀 Secure Login';
-    }
-
     if (!res.success) {
       if (errBox) {
         errBox.textContent = res.message || 'Authentication failed.';

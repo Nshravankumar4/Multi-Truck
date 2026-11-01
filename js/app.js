@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Transport Brokerage Ledger Pvt Ltd
  * Main Application Orchestrator & State Controller (app.js)
  */

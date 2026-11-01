@@ -40,18 +40,18 @@
       <div id="auth-message" class="notice notice-info" role="status" aria-live="polite" hidden></div>
       <div id="loginErrorMsg" class="notice notice-error" role="alert" style="display: none;"></div>
 
-      <form id="authLoginForm" novalidate onsubmit="AuthModule.handleLogin(event)">
+      <form id="authLoginForm" novalidate>
         <div class="user-switch-container">
           <label class="user-switch-label">SELECT USER ACCOUNT</label>
           <div class="user-switch-group">
-            <button type="button" id="userBtnAdmin" class="user-switch-card active" aria-label="Select Admin Account" onclick="AuthModule.selectLoginUser('Admin')">
+            <button type="button" id="userBtnAdmin" class="user-switch-card active" aria-label="Select Admin Account">
               <div class="user-switch-badge">👑</div>
               <div class="user-switch-info">
                 <span class="user-switch-name">ADMIN</span>
                 <span class="user-switch-role">Administrator</span>
               </div>
             </button>
-            <button type="button" id="userBtnRudra" class="user-switch-card" aria-label="Select Rudra Account" onclick="AuthModule.selectLoginUser('Rudra')">
+            <button type="button" id="userBtnRudra" class="user-switch-card" aria-label="Select Rudra Account">
               <div class="user-switch-badge">👤</div>
               <div class="user-switch-info">
                 <span class="user-switch-name">RUDRA</span>
@@ -68,7 +68,7 @@
           <div class="auth-password-control">
             <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter password for Admin" required>
             <input id="login-password" type="hidden">
-            <button id="togglePasswordBtn" class="auth-toggle-pwd" type="button" aria-label="Toggle password visibility" title="Show/Hide Password" onclick="AuthModule.togglePasswordVisibility()">👁️</button>
+            <button id="togglePasswordBtn" class="auth-toggle-pwd" type="button" aria-label="Toggle password visibility" title="Show/Hide Password">👁️</button>
           </div>
         </div>
 
