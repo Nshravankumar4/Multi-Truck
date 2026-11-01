@@ -557,6 +557,10 @@ function deleteRecordFromSheet(ss, recordType, recordId, user) {
   };
 }
 
+function processDeleteRecord(ss, recordType, truckId, recordId, user) {
+  return deleteRecordFromSheet(ss, recordType, recordId, user);
+}
+
 function clearDataRows(sheet) {
   if (!sheet) return;
   var lastRow = sheet.getLastRow();
