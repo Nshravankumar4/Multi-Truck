@@ -28,3 +28,4 @@
    - Financial ledger tables are contained in `.table-scroll` containers with `overflow-x: auto` and `-webkit-overflow-scrolling: touch`, preserving currency column alignments and preventing page horizontal scrollbars.
 4. **Accessible Touch Targets:**
    - All interactive buttons and navigation tabs have minimum touch targets of 44px × 44px for compliant mobile usability.
+

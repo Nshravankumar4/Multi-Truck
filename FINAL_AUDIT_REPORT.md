@@ -52,3 +52,4 @@ All core accounting metrics have been tested against the authoritative October 2
 - **Driver Settlements:**
   - **TG15T6666 (Noor Allam):** Commission ₹40,740 + Claimed Road ₹28,700 + Prior Due ₹13,800 - Advances ₹78,200 = **₹5,040 Payable to Driver**. (Itemized vs Claimed variance preserved: ₹28,735 vs ₹28,700, Diff ₹35).
   - **TS15UE1122 (Allam Brother):** Advances ₹41,500 - Commission ₹23,880 - Road ₹11,790 = ₹5,830 current deficit + Prior Owed ₹62,340 = **₹68,170 Payable by Driver**.
+

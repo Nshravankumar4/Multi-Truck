@@ -105,3 +105,4 @@ $$\text{Profit Margin} = \left(\frac{\text{Net Profit}}{P_1}\right) \times 100$$
 | **Net Profit Margin** | **32.84%** | **22.17%** | **28.77%** | **MATCH (100%)** |
 | Total Driver Advances Paid | ₹78,200 | ₹41,500 | **₹1,19,700** | **MATCH (100%)** |
 | Driver Settlement Balance | ₹5,040 (Payable) | ₹68,170 (Receivable) | **Net: ₹63,130 Rec.** | **MATCH (100%)** |
+

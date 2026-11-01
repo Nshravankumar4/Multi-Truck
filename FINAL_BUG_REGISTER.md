@@ -62,3 +62,4 @@
 - **Root Cause:** Missing directional state handling for previous balance debt (₹62,340).
 - **Fix:** Implemented explicit direction handling: ₹5,830 current period deficit + ₹62,340 prior debt = ₹68,170 payable by driver to transporter.
 - **Verification:** `test_suite.ps1` Test 6 PASSED.
+

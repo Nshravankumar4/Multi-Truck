@@ -61,3 +61,4 @@ The backend initializes and synchronizes the following 12 tabs:
    - Navigate to repository settings on GitHub: **Settings** > **Pages**.
    - Ensure source is configured to deploy from branch `main` (`/ (root)`).
    - Visit: `https://nshravankumar4.github.io/Multi-Truck/`.
+

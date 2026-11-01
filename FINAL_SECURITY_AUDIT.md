@@ -56,3 +56,4 @@ In `doPost(e)` under `action === "saveData"` / `action === "syncLedgerData"`:
 - Raw Google Spreadsheet link (`https://docs.google.com/spreadsheets/d/1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4/edit`) is strictly hidden from non-admin users (`.admin-only`).
 - Apps Script project editor URLs have been purged from the client application.
 - Web App API Endpoint: `https://script.google.com/macros/s/AKfycbwREdyxaW64mixcHfFNyspj_KD_jxYYryQWjRukjPiBxdjkNoG0tguD0vaPW0n0cMcinQ/exec`.
+

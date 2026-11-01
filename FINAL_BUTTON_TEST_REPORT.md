@@ -65,3 +65,4 @@
 | `#btnHeaderSync` | Quick header sync trigger | Executes sync and broadcasts update via `BroadcastChannel` | **PASS** |
 | `#topExportExcelBtn` | Generates and downloads multi-sheet `.xlsx` file using ExcelJS | Builds genuine Excel workbook with live formulas (=SUM, 12% Comm) and triggers download | **PASS** |
 | `#openCloudSheetBtn` | Opens dedicated Google Sheet in new browser tab (Admin Only) | Opens sheet URL for Admin; blocked with alert for non-admin | **PASS** |
+
