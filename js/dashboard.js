@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Transport Brokerage Ledger Pvt Ltd
  * Dashboard Module (dashboard.js)
  * Clean, simplified dashboard per SR_B UI reference
