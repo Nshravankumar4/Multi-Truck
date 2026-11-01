@@ -14,7 +14,6 @@ const ApiModule = (() => {
     SPREADSHEET_ID: "1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4",
     GAS_URL: "https://script.google.com/macros/s/AKfycbwREdyxaW64mixcHfFNyspj_KD_jxYYryQWjRukjPiBxdjkNoG0tguD0vaPW0n0cMcinQ/exec",
     DEPLOYMENT_ID: "AKfycbwREdyxaW64mixcHfFNyspj_KD_jxYYryQWjRukjPiBxdjkNoG0tguD0vaPW0n0cMcinQ",
-    SCRIPT_PROJECT_URL: "https://script.google.com/u/0/home/projects/1l4GkXJ-eiX-SzyeGlfBMWc-H32sE2ubeNnq_LDEDXqMtYhU6b4Zls8bL/edit",
     SYNC_INTERVAL_MS: 300000,
     REQUEST_TIMEOUT_MS: 20000
   };
@@ -198,14 +197,6 @@ const ApiModule = (() => {
     }
   }
 
-  function openScriptProject() {
-    if (typeof AuthModule !== 'undefined' && !AuthModule.isAdmin()) {
-      alert("Access Denied: Only Administrator (Admin) can access Google Apps Script editor.");
-      return;
-    }
-    window.open(CONFIG.SCRIPT_PROJECT_URL, '_blank');
-  }
-
   function getConfig() {
     if (typeof AuthModule !== 'undefined' && !AuthModule.isAdmin()) {
       return {
@@ -247,7 +238,6 @@ const ApiModule = (() => {
     deleteRecordOnServer,
     getSpreadsheetUrl,
     openGoogleSheet,
-    openScriptProject,
     getConfig,
     updateGasUrl,
     escapeHtml

@@ -200,7 +200,7 @@ Assert-Test "Authoritative Master Data Parity" (
 Assert-Test "Admin-Only Settings Modal & Cloud Links Protection" (
     $apiContent.Contains("AKfycbwREdyxaW64mixcHfFNyspj_KD_jxYYryQWjRukjPiBxdjkNoG0tguD0vaPW0n0cMcinQ") -and
     $apiContent.Contains("1dy6GxF_9TtWLA_Yogc53cNnJWHz9mQks1ETsyDYAbz4") -and
-    $apiContent.Contains("1l4GkXJ-eiX-SzyeGlfBMWc-H32sE2ubeNnq_LDEDXqMtYhU6b4Zls8bL") -and
+    (!$apiContent.Contains("1l4GkXJ-eiX-SzyeGlfBMWc-H32sE2ubeNnq_LDEDXqMtYhU6b4Zls8bL")) -and
     $htmlContent.Contains("settingsModal"" class=""app-modal-overlay admin-only""") -and
     $appContent.Contains("Access Denied: Only Administrator (Admin) can view and configure cloud spreadsheet settings") -and
     $apiContent.Contains("Access Denied: Only Administrator (Admin) can access the raw Google Spreadsheet")

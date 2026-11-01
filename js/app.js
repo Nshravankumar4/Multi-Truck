@@ -604,7 +604,6 @@ const AppModule = (function () {
           </p>
           <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
             <button type="button" class="btn btn-primary btn-sm" onclick="ApiModule.openGoogleSheet()">📊 Open Google Spreadsheet</button>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="ApiModule.openScriptProject()">⚡ Open Apps Script Editor</button>
             <button type="button" class="btn btn-secondary btn-sm" onclick="AppModule.openSettingsModal()">⚙️ Configure Endpoints</button>
           </div>
         </div>
@@ -863,9 +862,6 @@ const AppModule = (function () {
 
     const openSheetBtn = document.getElementById('openCloudSheetBtn');
     if (openSheetBtn) openSheetBtn.addEventListener('click', () => ApiModule.openGoogleSheet());
-
-    const openScriptBtn = document.getElementById('openScriptProjectBtn');
-    if (openScriptBtn) openScriptBtn.addEventListener('click', () => ApiModule.openScriptProject());
 
     const restoreDataBtn = document.getElementById('restoreOriginalDataBtn');
     if (restoreDataBtn) {
